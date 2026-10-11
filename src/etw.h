@@ -2,13 +2,20 @@
 #include "common.h"
 #define DTOPN 4
 typedef struct { DWORD pid; LONGLONG v; } DTOP;          // per-disk top, bytes/s
-typedef struct { DWORD pid; LONGLONG rx, tx; ULONGLONG totRx, totTx; } NTOP;   // rates bytes/s, totals since start
+typedef struct {                           // net process row: totals since start + current rates
+    DWORD pid; WCHAR name[NAME_LEN];
+    LONGLONG rx, tx;                       // bytes/s this tick (0 if idle)
+    ULONGLONG totRx, totTx;
+    int live;                              // traffic in the last NET_IDLE_MS
+} NTOP;
+#define NET_IDLE_MS 5000
 enum { ETW_OFF, ETW_ON, ETW_DENIED, ETW_DIED };          // etwState
 extern int etwOn, etwState, etwTicks;      // etwOn == (etwState == ETW_ON); etwTicks: ticks since session start
 extern ULONG etwErr, etwLost;              // last start error; events lost (from session query)
 extern DTOP dtop[MAXD][DTOPN]; extern int ndtop[MAXD];
-extern NTOP ntop[TOPN]; extern int nNtop;
+extern NTOP ntop[TOPN]; extern int nNtop;   // top by totRx desc (all processes seen since start)
 void EtwInit();
 void EtwStart();                           // at startup; EtwTick retries every 15 s while down, health check every 10 s
 void EtwStop();                            // on exit
-void EtwTick();                            // every timer tick: per-disk tops, net tops + cumulative totals
+void EtwTick();                            // every timer tick: per-disk tops, cumulative net totals + list
+void EtwNames();                           // after SampleProcs: remember names of active pids

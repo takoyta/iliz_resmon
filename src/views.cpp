@@ -147,9 +147,9 @@ static void NetCols(PCTX *c, int *x) {                   // x[0..4]: left edges 
     x[4] = R; x[3] = R - w; x[2] = R - 2 * w; x[1] = R - 3 * w - SC(10); x[0] = R - 4 * w - SC(10);
 }
 
-static void NetRow(PCTX *c, const STICKY *e, LONGLONG full) {
+static void NetRow(PCTX *c, const NTOP *e, LONGLONG full) {   // bar = total rx relative to the top row
     int x[5]; NetCols(c, x); WCHAR a[24], s[32];
-    COLORREF ct = ListRow(c, c->L, x[0] - SC(6), e->name, e->v, full, 3, e->live);
+    COLORREF ct = ListRow(c, c->L, x[0] - SC(6), e->name, (LONGLONG)e->totRx, full, 3, e->live);
     FmtRate(a, e->rx);    wsprintfW(s, L"↓ %s", a); Text(c, x[0], x[1] - SC(6), s, ct, DT_RIGHT);
     FmtRate(a, e->tx);    wsprintfW(s, L"↑ %s", a); Text(c, x[1], x[2] - SC(10), s, e->live ? C_TX : C_GHOST, DT_RIGHT);
     FmtBytes(a, e->totRx); wsprintfW(s, L"↓ %s", a); Text(c, x[2], x[3] - SC(6), s, e->live ? C_RX_TOT : C_GHOST, DT_RIGHT);
@@ -174,10 +174,9 @@ static void PaintNet(PCTX *c) {
     Text(c, c->L, x[0], L"Процессы", c->cMain, DT_LEFT);
     Text(c, x[0], x[2] - SC(10), L"скорость", c->cDim, DT_CENTER);
     Text(c, x[2], x[4], L"всего", c->cDim, DT_CENTER); c->row++;
-    const STLIST *l = &stNet;
-    if (!l->n) Text(c, c->L + SC(8), c->R, etwTicks ? L"тишина" : L"Измеряю…", c->cDim, DT_LEFT);
-    LONGLONG full = l->n ? l->e[0].v : 1;
-    for (int i = 0; i < l->n; i++) NetRow(c, &l->e[i], full);
+    if (!nNtop) Text(c, c->L + SC(8), c->R, etwTicks ? L"тишина" : L"Измеряю…", c->cDim, DT_LEFT);
+    LONGLONG full = nNtop ? (LONGLONG)ntop[0].totRx : 1;
+    for (int i = 0; i < nNtop; i++) NetRow(c, &ntop[i], full);
 }
 
 void ViewPaint(PCTX *c, int mode) {

@@ -5,6 +5,7 @@
 #include <evntcons.h>
 #include "etw.h"
 #include "disk.h"
+#include "procs.h"
 
 static const GUID DiskIoGuid = {0x3d6fa8d4, 0xfe05, 0x11d0, {0x9d, 0xda, 0x00, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}};
 static const GUID TcpGuid    = {0x9a280ac0, 0xc8e0, 0x11d1, {0x84, 0xe2, 0x00, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}};
@@ -30,7 +31,7 @@ typedef struct { DWORD key; int disk; LONGLONG bytes; } AGG;       // key = pid 
 typedef struct { DWORD key; LONGLONG rx, tx; } NAGG;
 static AGG agg[AGGN], snap[AGGN]; static int nAgg;
 static NAGG nagg[NAGGN], nsnap[NAGGN]; static int nNagg;
-typedef struct { DWORD key; LONGLONG create; ULONGLONG rx, tx, last; } CUM;   // main thread only
+typedef struct { DWORD key; LONGLONG create; ULONGLONG rx, tx, last; LONGLONG rps, tps; WCHAR name[NAME_LEN]; } CUM;   // main thread only; name = last known
 static CUM cum[CUMN]; static int nCum;
 static CRITICAL_SECTION cs;
 static DWORD thTid[THN], thPid[THN], thAt[THN];          // thread -> process cache + lookup time in s (trace thread only)
@@ -227,26 +228,48 @@ static CUM *CumAdd(DWORD key, LONGLONG rx, LONGLONG tx) {
     CUM *c = CumFind(key);
     if (c->key && tickNow - c->last > 10000) {          // idle a while: check for pid reuse
         LONGLONG ct = CreateTime(key - 1);
-        if (ct != c->create) { c->rx = c->tx = 0; c->create = ct; }
+        if (ct != c->create) { c->rx = c->tx = 0; c->create = ct; c->name[0] = 0; }
     }
     if (!c->key) {
         if (nCum >= CUMN * 3 / 4) { CumEvict(); c = CumFind(key); }
-        c->key = key; c->create = CreateTime(key - 1); c->rx = c->tx = 0; nCum++;
+        c->key = key; c->create = CreateTime(key - 1); c->rx = c->tx = 0; c->name[0] = 0; nCum++;
     }
     c->rx += rx; c->tx += tx; c->last = tickNow;
     return c;
 }
 
-static void NetTick(LONGLONG dt) {                       // fold into totals, top by current rate
-    nNtop = 0;
+static void NetTick(LONGLONG dt) {                       // fold this tick into totals, then top 10 by total rx
     for (int i = 0; i < NAGGN; i++) if (nsnap[i].key) {
         NAGG *g = &nsnap[i];
         CUM *c = CumAdd(g->key, g->rx, g->tx);
-        NTOP x = {g->key - 1, g->rx * 1000 / dt, g->tx * 1000 / dt, c->rx, c->tx};
-        LONGLONG v = x.rx + x.tx; if (v <= 0) continue;
+        c->rps = g->rx * 1000 / dt; c->tps = g->tx * 1000 / dt;
+    }
+    nNtop = 0;
+    for (int i = 0; i < CUMN; i++) if (cum[i].key) {
+        CUM *c = &cum[i];
+        if (c->last != tickNow) c->rps = c->tps = 0;     // idle this tick
+        if (!c->rx && !c->tx) continue;
         int k = nNtop < TOPN ? nNtop++ : TOPN;
-        while (k > 0 && ntop[k - 1].rx + ntop[k - 1].tx < v) { if (k < TOPN) ntop[k] = ntop[k - 1]; k--; }
-        if (k < TOPN) ntop[k] = x;
+        while (k > 0 && (ntop[k - 1].totRx < c->rx || (ntop[k - 1].totRx == c->rx && ntop[k - 1].totTx < c->tx))) {
+            if (k < TOPN) ntop[k] = ntop[k - 1];
+            k--;
+        }
+        if (k >= TOPN) continue;
+        NTOP *t = &ntop[k];
+        t->pid = c->key - 1; t->rx = c->rps; t->tx = c->tps; t->totRx = c->rx; t->totTx = c->tx;
+        t->live = tickNow - c->last < NET_IDLE_MS;
+        lstrcpynW(t->name, c->name[0] ? c->name : NameOf(t->pid), NAME_LEN);
+    }
+}
+
+void EtwNames() {                                        // keep names so exited processes stay readable
+    for (int i = 0; i < CUMN; i++) if (cum[i].key && cum[i].last == tickNow) {
+        const WCHAR *n = NameOf(cum[i].key - 1);
+        if (n[0] != '?') lstrcpynW(cum[i].name, n, NAME_LEN);
+    }
+    for (int i = 0; i < nNtop; i++) if (!ntop[i].name[0] || ntop[i].name[0] == '?') {
+        CUM *c = CumFind(ntop[i].pid + 1);
+        if (c->key && c->name[0]) lstrcpynW(ntop[i].name, c->name, NAME_LEN);
     }
 }
 
@@ -256,7 +279,7 @@ void EtwTick() {
         etwCheckAt = now + ETW_CHECK_MS;
         if (!Alive()) { etwErr = 0; Cleanup(ETW_DIED); }
     }
-    if (!etwOn) { nNtop = 0; for (int i = 0; i < ndisk; i++) ndtop[i] = 0; if (now >= etwRetryAt) EtwStart(); return; }
+    if (!etwOn) { for (int i = 0; i < ndisk; i++) ndtop[i] = 0; if (now >= etwRetryAt) EtwStart(); return; }   // net totals kept
     EnterCriticalSection(&cs);
     CopyMemory(snap, agg, sizeof(agg)); ZeroMemory(agg, sizeof(agg)); nAgg = 0;
     CopyMemory(nsnap, nagg, sizeof(nagg)); ZeroMemory(nagg, sizeof(nagg)); nNagg = 0;

@@ -19,6 +19,7 @@ void AppSample() {
     SampleMem(); SampleDisks(); SampleNet();
     EtwTick();                             // per-disk / per-process net from the trace
     SampleProcs();                         // after EtwTick: NameOf() for trace pids uses this snapshot
+    EtwNames();                            // after SampleProcs: names for the net totals table
 }
 
 void AppTick() {

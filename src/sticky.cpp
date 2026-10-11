@@ -3,26 +3,24 @@
 #include "etw.h"
 #include "disk.h"
 
-STLIST stTop[TM_N], stNet, stDisk[MAXD];
+STLIST stTop[TM_N], stDisk[MAXD];
 
 static void Update(STLIST *l, const STICKY *live, int nLive, int cap) {   // cap <= TOPN
     static STICKY a[2 * TOPN]; int n = 0;                // static: keep the stack frame small
     for (int i = 0; i < nLive && i < cap; i++) {
         a[n] = live[i]; a[n].seen = tickNow; a[n].live = 1;
-        a[n].peakV = a[n].v; a[n].peakRx = a[n].rx; a[n].peakTx = a[n].tx; n++;
+        a[n].peakV = a[n].v; n++;
     }
     for (int i = 0; i < l->n; i++) {                     // previous rows: carry peaks / become ghosts
         const STICKY *o = &l->e[i]; int dup = 0;
         for (int k = 0; k < nLive && k < cap; k++) if (a[k].pid == o->pid) {
             dup = 1;                                     // still live: carry its peak forward
             if (o->peakV > a[k].peakV) a[k].peakV = o->peakV;
-            if (o->peakRx > a[k].peakRx) a[k].peakRx = o->peakRx;
-            if (o->peakTx > a[k].peakTx) a[k].peakTx = o->peakTx;
             break;
         }
         if (dup || tickNow - o->seen >= GHOST_MS) continue;
         a[n] = *o; a[n].live = 0;                        // ghost shows the peak it had while live
-        a[n].v = o->peakV; a[n].rx = o->peakRx; a[n].tx = o->peakTx; n++;
+        a[n].v = o->peakV; n++;
     }
     for (int i = 1; i < n; i++) {                        // insertion sort by value desc
         STICKY t = a[i]; int k = i;
@@ -38,9 +36,8 @@ static void Update(STLIST *l, const STICKY *live, int nLive, int cap) {   // cap
     CopyMemory(l->e, a, n * sizeof(STICKY)); l->n = n;
 }
 
-static STICKY *Row(STICKY *a, DWORD pid, const WCHAR *name, LONGLONG v) {
+static void Row(STICKY *a, DWORD pid, const WCHAR *name, LONGLONG v) {
     ZeroMemory(a, sizeof(*a)); a->pid = pid; lstrcpynW(a->name, name, NAME_LEN); a->v = v;
-    return a;
 }
 
 void StickyTick() {
@@ -49,11 +46,6 @@ void StickyTick() {
         for (int i = 0; i < nTop[m]; i++) Row(&a[i], top[m][i].pid, top[m][i].name, top[m][i].v);
         Update(&stTop[m], a, nTop[m], TOPN);
     }
-    for (int i = 0; i < nNtop; i++) {
-        STICKY *r = Row(&a[i], ntop[i].pid, NameOf(ntop[i].pid), ntop[i].rx + ntop[i].tx);
-        r->rx = ntop[i].rx; r->tx = ntop[i].tx; r->totRx = ntop[i].totRx; r->totTx = ntop[i].totTx;
-    }
-    Update(&stNet, a, nNtop, TOPN);
     for (int d = 0; d < ndisk; d++) {
         for (int i = 0; i < ndtop[d]; i++) Row(&a[i], dtop[d][i].pid, NameOf(dtop[d][i].pid), dtop[d][i].v);
         Update(&stDisk[d], a, ndtop[d], DTOPN);
