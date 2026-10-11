@@ -3,8 +3,9 @@
 #define DTOPN 4
 typedef struct { DWORD pid; LONGLONG v; } DTOP;          // per-disk top, bytes/s
 typedef struct { DWORD pid; LONGLONG rx, tx; ULONGLONG totRx, totTx; } NTOP;   // rates bytes/s, totals since start
-extern int etwOn, etwTicks;                // etwTicks: ticks folded since the session started
-extern ULONG etwErr;
+enum { ETW_OFF, ETW_ON, ETW_DENIED, ETW_DIED };          // etwState
+extern int etwOn, etwState, etwTicks;      // etwOn == (etwState == ETW_ON); etwTicks: ticks since session start
+extern ULONG etwErr, etwLost;              // last start error; events lost (from session query)
 extern DTOP dtop[MAXD][DTOPN]; extern int ndtop[MAXD];
 extern NTOP ntop[TOPN]; extern int nNtop;
 void EtwInit();

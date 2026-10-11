@@ -9,7 +9,8 @@ static const GUID DiskIoGuid = {0x3d6fa8d4, 0xfe05, 0x11d0, {0x9d, 0xda, 0x00, 0
 static const GUID TcpGuid    = {0x9a280ac0, 0xc8e0, 0x11d1, {0x84, 0xe2, 0x00, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}};
 static const GUID UdpGuid    = {0xbf3a50c5, 0xa9c9, 0x4988, {0xa0, 0x05, 0x2d, 0xf0, 0xb7, 0xc8, 0x0f, 0x80}};
 static const GUID SessGuid   = {0x6c1a7f3e, 0x41b2, 0x4d8e, {0x9a, 0x51, 0x2e, 0x7c, 0x10, 0x5b, 0x33, 0xa4}};
-#define SESS_NAME L"CpuTrayDiskIo"
+#define SESS_NAME L"CpuTray"
+#define OLD_SESS_NAME L"CpuTrayDiskIo"                    // name used up to 0.11.0
 #define AGGN 1024                                        // per-tick hash tables (power of 2)
 #define NAGGN 1024
 #define CUMN 2048                                        // cumulative per-process net totals
@@ -23,7 +24,8 @@ static NAGG nagg[NAGGN], nsnap[NAGGN]; static int nNagg;
 typedef struct { DWORD key; LONGLONG create; ULONGLONG rx, tx, last; } CUM;   // main thread only
 static CUM cum[CUMN]; static int nCum;
 static CRITICAL_SECTION cs;
-static DWORD thTid[THN], thPid[THN];                     // thread -> process cache (trace thread only)
+static DWORD thTid[THN], thPid[THN], thAt[THN];          // thread -> process cache + lookup time in s (trace thread only)
+#define TH_TTL 30                                        // thread ids get reused: re-check after 30 s
 static TRACEHANDLE etwSess, etwTrace = INVALID_PROCESSTRACE_HANDLE;
 static HANDLE etwThread;
 static BYTE etwProps[sizeof(EVENT_TRACE_PROPERTIES) + 2 * sizeof(SESS_NAME) + 16];
@@ -31,7 +33,7 @@ static ULONGLONG etwRetryAt, etwCheckAt;
 #define ETW_RETRY_MS 15000
 #define ETW_CHECK_MS 10000
 
-int etwOn, etwTicks; ULONG etwErr;
+int etwOn, etwState, etwTicks; ULONG etwErr, etwLost;
 DTOP dtop[MAXD][DTOPN]; int ndtop[MAXD];
 NTOP ntop[TOPN]; int nNtop;
 
@@ -40,15 +42,16 @@ static inline UINT Hash(DWORD k) { return (k * 2654435761u) >> 8; }
 void EtwInit() { InitializeCriticalSection(&cs); }
 
 static DWORD PidOfThread(DWORD tid) {
+    DWORD now = (DWORD)(GetTickCount64() / 1000);
     int h = (tid >> 2) & (THN - 1);
     for (int k = 0; k < 8; k++, h = (h + 1) & (THN - 1)) {
-        if (thTid[h] == tid) return thPid[h];
+        if (thTid[h] == tid) { if (now - thAt[h] < TH_TTL) return thPid[h]; break; }
         if (!thTid[h]) break;
     }
     DWORD pid = 0;
     HANDLE t = OpenThread(THREAD_QUERY_LIMITED_INFORMATION, FALSE, tid);
     if (t) { pid = GetProcessIdOfThread(t); CloseHandle(t); }
-    thTid[h] = tid; thPid[h] = pid;
+    thTid[h] = tid; thPid[h] = pid; thAt[h] = now;
     return pid;
 }
 
@@ -90,7 +93,11 @@ static void WINAPI OnEvent(PEVENT_RECORD e) {
     else if (IsEqualGUID(g, DiskIoGuid)) OnDisk(e);
 }
 
-static DWORD WINAPI TraceThread(LPVOID) { ProcessTrace(&etwTrace, 1, 0, 0); return 0; }
+static DWORD WINAPI TraceThread(LPVOID) {
+    ZeroMemory(thTid, sizeof(thTid));                    // cache is owned by this thread
+    ProcessTrace(&etwTrace, 1, 0, 0);
+    return 0;
+}
 
 static EVENT_TRACE_PROPERTIES *Props() {
     ZeroMemory(etwProps, sizeof(etwProps));
@@ -101,7 +108,7 @@ static EVENT_TRACE_PROPERTIES *Props() {
     p->Wnode.Guid = SessGuid;
     p->LogFileMode = EVENT_TRACE_REAL_TIME_MODE | EVENT_TRACE_SYSTEM_LOGGER_MODE;
     p->EnableFlags = EVENT_TRACE_FLAG_DISK_IO | EVENT_TRACE_FLAG_NETWORK_TCPIP;
-    p->BufferSize = 16; p->MinimumBuffers = 2; p->MaximumBuffers = 4; p->FlushTimer = 1;
+    p->BufferSize = 16; p->MinimumBuffers = 4; p->MaximumBuffers = 32; p->FlushTimer = 1;   // KB; up to 512 KB pool
     p->LoggerNameOffset = sizeof(EVENT_TRACE_PROPERTIES);
     return p;
 }
@@ -116,41 +123,55 @@ static void EnableProfilePrivilege() {
     CloseHandle(tk);
 }
 
-static void Cleanup() {                                  // stop session (if ours/alive), close handles
+static BOOL ThreadDone() {                               // reap the trace thread if it has exited
+    if (!etwThread) return TRUE;
+    if (WaitForSingleObject(etwThread, 0) != WAIT_OBJECT_0) return FALSE;
+    CloseHandle(etwThread); etwThread = 0;
+    return TRUE;
+}
+
+static void Cleanup(int state) {                         // stop session (if alive), close handles
     ControlTraceW(0, SESS_NAME, Props(), EVENT_TRACE_CONTROL_STOP);
     if (etwTrace != INVALID_PROCESSTRACE_HANDLE) CloseTrace(etwTrace);
-    if (etwThread) { WaitForSingleObject(etwThread, 2000); CloseHandle(etwThread); }
-    etwTrace = INVALID_PROCESSTRACE_HANDLE; etwThread = 0; etwOn = 0;
+    if (etwThread) WaitForSingleObject(etwThread, 2000);
+    ThreadDone();                                        // still running -> keep handle, EtwStart waits for it
+    etwTrace = INVALID_PROCESSTRACE_HANDLE; etwOn = 0; etwState = state;
     etwRetryAt = GetTickCount64() + ETW_RETRY_MS;
 }
 
-void EtwStop() { if (etwOn) Cleanup(); }
+void EtwStop() { if (etwOn) Cleanup(ETW_OFF); }
 
 static BOOL Alive() {                                    // trace thread running and session still exists
     if (etwThread && WaitForSingleObject(etwThread, 0) == WAIT_OBJECT_0) return FALSE;
-    return ControlTraceW(0, SESS_NAME, Props(), EVENT_TRACE_CONTROL_QUERY) == ERROR_SUCCESS;
+    EVENT_TRACE_PROPERTIES *p = Props();
+    if (ControlTraceW(0, SESS_NAME, p, EVENT_TRACE_CONTROL_QUERY) != ERROR_SUCCESS) return FALSE;
+    etwLost = p->EventsLost + p->RealTimeBuffersLost;
+    return TRUE;
 }
 
 void EtwStart() {
     if (etwOn) return;
     etwRetryAt = GetTickCount64() + ETW_RETRY_MS;
+    if (!ThreadDone()) return;                           // previous trace thread still draining
+    static int oldStopped;
+    if (!oldStopped) { oldStopped = 1; ControlTraceW(0, OLD_SESS_NAME, Props(), EVENT_TRACE_CONTROL_STOP); }
     EnableProfilePrivilege();
     ULONG st = StartTraceW(&etwSess, SESS_NAME, Props());
     if (st == ERROR_ALREADY_EXISTS) {                    // orphan from a killed instance
         ULONG s2 = ControlTraceW(0, SESS_NAME, Props(), EVENT_TRACE_CONTROL_STOP);
         st = s2 == ERROR_SUCCESS ? StartTraceW(&etwSess, SESS_NAME, Props()) : s2;   // access denied -> retry later
     }
-    if (st != ERROR_SUCCESS) { etwErr = st; return; }
+    if (st != ERROR_SUCCESS) { etwErr = st; etwState = ETW_DENIED; return; }
     EVENT_TRACE_LOGFILEW lf = {0};
     lf.LoggerName = (LPWSTR)SESS_NAME;
     lf.ProcessTraceMode = PROCESS_TRACE_MODE_REAL_TIME | PROCESS_TRACE_MODE_EVENT_RECORD;
     lf.EventRecordCallback = OnEvent;
     etwTrace = OpenTraceW(&lf);
-    if (etwTrace == INVALID_PROCESSTRACE_HANDLE) { ControlTraceW(0, SESS_NAME, Props(), EVENT_TRACE_CONTROL_STOP); etwErr = GetLastError(); return; }
-    ZeroMemory(agg, sizeof(agg)); ZeroMemory(nagg, sizeof(nagg)); nAgg = nNagg = 0;
-    ZeroMemory(thTid, sizeof(thTid));
+    if (etwTrace == INVALID_PROCESSTRACE_HANDLE) { ControlTraceW(0, SESS_NAME, Props(), EVENT_TRACE_CONTROL_STOP); etwErr = GetLastError(); etwState = ETW_DENIED; return; }
+    ZeroMemory(agg, sizeof(agg)); ZeroMemory(nagg, sizeof(nagg)); nAgg = nNagg = 0;   // no thread running now
     etwThread = CreateThread(0, 0, TraceThread, 0, 0, 0);
-    etwOn = 1; etwErr = 0; etwTicks = 0;
+    if (!etwThread) { etwErr = GetLastError(); Cleanup(ETW_DENIED); return; }
+    etwOn = 1; etwState = ETW_ON; etwErr = 0; etwLost = 0; etwTicks = 0;
     etwCheckAt = GetTickCount64() + ETW_CHECK_MS;
 }
 
@@ -224,7 +245,7 @@ void EtwTick() {
     ULONGLONG now = GetTickCount64();
     if (etwOn && now >= etwCheckAt) {                    // session killed (e.g. by anti-cheat) -> restart later
         etwCheckAt = now + ETW_CHECK_MS;
-        if (!Alive()) { etwErr = ERROR_INVALID_HANDLE; Cleanup(); }
+        if (!Alive()) { etwErr = 0; Cleanup(ETW_DIED); }
     }
     if (!etwOn) { nNtop = 0; for (int i = 0; i < ndisk; i++) ndtop[i] = 0; if (now >= etwRetryAt) EtwStart(); return; }
     EnterCriticalSection(&cs);

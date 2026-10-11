@@ -16,7 +16,9 @@ static int IconSize() { return GetSystemMetricsForDpi(SM_CXSMICON, GetDpiForSyst
 typedef struct { int S; HDC sdc, dc; HBITMAP col, mask; HGDIOBJ old; } CANVAS;
 static void Begin(CANVAS *c, COLORREF bg) {
     c->S = IconSize(); c->sdc = GetDC(0); c->dc = CreateCompatibleDC(c->sdc);
-    c->col = CreateCompatibleBitmap(c->sdc, c->S, c->S); c->mask = CreateBitmap(c->S, c->S, 1, 1, 0);
+    static BYTE zero[32 * 256];                          // all-zero AND mask = fully opaque (max 256 px, .bss)
+    if (c->S > 256) c->S = 256;
+    c->col = CreateCompatibleBitmap(c->sdc, c->S, c->S); c->mask = CreateBitmap(c->S, c->S, 1, 1, zero);
     c->old = SelectObject(c->dc, c->col);
     RECT r = {0, 0, c->S, c->S}; HBRUSH b = CreateSolidBrush(bg);
     FillRect(c->dc, &r, b); DeleteObject(b);
@@ -74,28 +76,31 @@ static HICON DrawMem() {                                 // one wide bar: used %
     return End(&c);
 }
 
-static void SetIcon(NOTIFYICONDATAW *nid, HICON *slot, HICON ic, DWORD msg) {
+static BOOL SetIcon(NOTIFYICONDATAW *nid, HICON *slot, HICON ic, DWORD msg) {
     nid->uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE; nid->hIcon = ic;
-    Shell_NotifyIconW(msg, nid);
+    BOOL ok = Shell_NotifyIconW(msg, nid);
     if (*slot) DestroyIcon(*slot);
     *slot = ic;
+    return ok;
 }
 
-static void Update(DWORD msg) {
+static BOOL Update(DWORD msg) {                          // FALSE if any icon is missing in the tray
+    BOOL ok = TRUE;
     wsprintfW(nidCpu.szTip, L"CPU: %d%%", AvgLoad());
-    SetIcon(&nidCpu, &icCpu, DrawBars(load, ncpu, C_CPU, C_CPU_DARK), msg);
+    ok &= SetIcon(&nidCpu, &icCpu, DrawBars(load, ncpu, C_CPU, C_CPU_DARK), msg);
     wsprintfW(nidMem.szTip, L"Память: %d%%", mem.load);
-    SetIcon(&nidMem, &icMem, DrawMem(), msg);
+    ok &= SetIcon(&nidMem, &icMem, DrawMem(), msg);
     if (ndisk) {
         int v[MAXD], mx = 0;
         for (int i = 0; i < ndisk; i++) { v[i] = disks[i].busy; if (v[i] > mx) mx = v[i]; }
         wsprintfW(nidDisk.szTip, L"Диски: %d%%", mx);
-        SetIcon(&nidDisk, &icDisk, DrawBars(v, ndisk, C_DSK, C_DSK_DARK), msg);
+        ok &= SetIcon(&nidDisk, &icDisk, DrawBars(v, ndisk, C_DSK, C_DSK_DARK), msg);
     }
     LONGLONG rx, tx; WCHAR a[24], b[24];
     NetTotals(&rx, &tx); FmtRate(a, rx); FmtRate(b, tx);
     wsprintfW(nidNet.szTip, L"Сеть: ↓%s ↑%s", a, b);
-    SetIcon(&nidNet, &icNet, DrawNet(), msg);
+    ok &= SetIcon(&nidNet, &icNet, DrawNet(), msg);
+    return ok;
 }
 
 void InitTray() {
@@ -107,7 +112,7 @@ void InitTray() {
     }
 }
 
-void UpdateIcons() { Update(NIM_MODIFY); }
+void UpdateIcons() { if (!Update(NIM_MODIFY)) AddIcons(); }   // tray not ready at logon / Explorer gone
 
 void AddIcons() {
     Update(NIM_ADD);

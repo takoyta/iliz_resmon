@@ -4,6 +4,8 @@
 #include "procs.h"
 #include "cpu.h"
 
+static_assert(sizeof(void*) == 8, "SYSTEM_PROCESS_INFORMATION offsets below are for x64 only");
+
 typedef struct {                                         // class 5 (x64 layout)
     ULONG Next, NThreads; LARGE_INTEGER PrivWs, R[2], Create, User, Kernel;
     USHORT Len, Max; PWSTR Name; LONG Prio; HANDLE Pid;
@@ -50,7 +52,11 @@ static const PREC *FindPrev(DWORD pid) {
 
 static void IndexPrev() {                                // hash table at <= 50% load
     int size = 64; while (size < nPrev * 2) size <<= 1;
-    if (size - 1 != hMask) { hIdx = (int*)Grow(hIdx, size * sizeof(int)); hMask = size - 1; }
+    if (size - 1 != hMask) {
+        int *h = (int*)Grow(hIdx, size * sizeof(int));
+        if (!h) { HeapFree(GetProcessHeap(), 0, hIdx); hIdx = 0; hMask = 0; return; }
+        hIdx = h; hMask = size - 1;
+    }
     for (int i = 0; i <= hMask; i++) hIdx[i] = -1;
     for (int i = 0; i < nPrev; i++) {
         UINT h = H(pPrev[i].pid) & hMask;
@@ -64,16 +70,16 @@ void SampleProcs() {
     for (;;) {
         st = NtQSI(5, pbuf, pbufSize, &need);
         if (st != (LONG)0xC0000004) break;               // STATUS_INFO_LENGTH_MISMATCH
-        pbufSize = need + 16384;
-        BYTE *nb = (BYTE*)Grow(pbuf, pbufSize); if (!nb) return; pbuf = nb;
+        BYTE *nb = (BYTE*)Grow(pbuf, need + 16384); if (!nb) return;
+        pbuf = nb; pbufSize = need + 16384;
     }
     if (st < 0) return;
     int n = 0;
     for (BYTE *p = pbuf;; p += ((SPI*)p)->Next) { n++; if (!((SPI*)p)->Next) break; }
     if (n > cap) {
+        PREC *a = (PREC*)Grow(pPrev, (n + 64) * sizeof(PREC)); if (!a) return; pPrev = a;
+        PREC *b = (PREC*)Grow(pCur, (n + 64) * sizeof(PREC));  if (!b) return; pCur = b;
         cap = n + 64;
-        pPrev = (PREC*)Grow(pPrev, cap * sizeof(PREC)); pCur = (PREC*)Grow(pCur, cap * sizeof(PREC));
-        if (!pPrev || !pCur) { cap = nPrev = haveBase = 0; return; }
     }
     int nCur = 0; LONGLONG dt = TickDt();
     for (int m = 0; m < TM_N; m++) nTop[m] = 0;

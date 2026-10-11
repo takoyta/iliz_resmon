@@ -35,9 +35,10 @@ static void OnTimer() {
 
 static void ShowAbout(HWND h) {
     WCHAR t[256];
-    wsprintfW(t, APP_NAME L"\nВерсия " APP_VERSION L"\n\n" APP_DESC L"\n\nТрассировка дисков/сети: %s",
-              etwOn ? L"работает" : L"недоступна");
+    static const WCHAR *st[] = {L"не запущена", L"работает", L"недоступна", L"прервана, перезапуск"};
+    wsprintfW(t, APP_NAME L"\nВерсия " APP_VERSION L"\n\n" APP_DESC L"\n\nТрассировка дисков/сети: %s", st[etwState]);
     if (etwErr) wsprintfW(t + lstrlenW(t), L" (ошибка %lu)", etwErr);
+    if (etwLost) wsprintfW(t + lstrlenW(t), L"\nПотеряно событий: %lu", etwLost);
     MessageBoxW(h, t, APP_NAME, MB_OK | MB_ICONINFORMATION | MB_TOPMOST);
 }
 
@@ -76,7 +77,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         PostQuitMessage(0); return 0;
     }
     if (m == wmTaskbar) { AddIcons(); return 0; }        // Explorer restarted
-    if (m == wmQuit && m) { DestroyWindow(h); return 0; } // elevated instance takes over
+    if (m == wmQuit) { DestroyWindow(h); return 0; }      // elevated instance takes over
     return DefWindowProcW(h, m, w, l);
 }
 
@@ -85,9 +86,12 @@ int WINAPI wWinMain(HINSTANCE hi, HINSTANCE, PWSTR, int) {
     HANDLE mx = CreateMutexW(0, TRUE, L"CpuTrayOnce");
     if (!mx || GetLastError() == ERROR_ALREADY_EXISTS) {  // another instance (or one we can't open)
         if (!mx || !IsElevated()) return 0;
-        HWND old = FindWindowExW(HWND_MESSAGE, 0, L"CpuTray", 0);
-        if (old) PostMessageW(old, wmQuit, 0, 0);
-        DWORD r = WaitForSingleObject(mx, 3000);
+        DWORD r = WAIT_TIMEOUT;                          // ask it to quit; it may still be starting up
+        for (int i = 0; i < 12 && r == WAIT_TIMEOUT; i++) {
+            HWND old = FindWindowW(L"CpuTray", 0);
+            if (old) PostMessageW(old, wmQuit, 0, 0);
+            r = WaitForSingleObject(mx, 250);
+        }
         if (r != WAIT_OBJECT_0 && r != WAIT_ABANDONED) return 0;
     }
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
@@ -99,7 +103,8 @@ int WINAPI wWinMain(HINSTANCE hi, HINSTANCE, PWSTR, int) {
     RegisterClassW(&wc);
     wc.lpfnWndProc = PopProc; wc.lpszClassName = L"CpuTrayPop"; wc.hCursor = LoadCursorW(0, (LPCWSTR)IDC_ARROW);
     RegisterClassW(&wc);
-    hMain = CreateWindowW(L"CpuTray", L"", 0, 0, 0, 0, 0, HWND_MESSAGE, 0, hi, 0);
+    // Hidden top-level window (not HWND_MESSAGE): message-only windows miss the TaskbarCreated broadcast.
+    hMain = CreateWindowExW(WS_EX_TOOLWINDOW, L"CpuTray", L"", WS_POPUP, 0, 0, 0, 0, 0, 0, hi, 0);
     ChangeWindowMessageFilterEx(hMain, wmQuit, MSGFLT_ALLOW, 0);
     hPop = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE, L"CpuTrayPop", L"",
                            WS_POPUP, 0, 0, 10, 10, 0, 0, hi, 0);
@@ -109,7 +114,6 @@ int WINAPI wWinMain(HINSTANCE hi, HINSTANCE, PWSTR, int) {
     SampleCpu(); SampleMem(); SampleNet(); SampleProcs();   // baseline: lists are ready after the first tick
     AddIcons();
     SetTimer(hMain, 1, 1000, 0);
-    SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);   // trim RAM after start
     MSG msg;
     while (GetMessageW(&msg, 0, 0, 0) > 0) DispatchMessageW(&msg);
     return 0;
