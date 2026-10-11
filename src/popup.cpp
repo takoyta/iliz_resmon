@@ -19,7 +19,17 @@ static void Place() {
     rows = ViewRows(popMode);
     int PW = ViewWidth(popMode), PH = ROWH * rows + SC(10), gap = SC(6);
     int px = (ir.left + ir.right) / 2 - PW / 2, py;
-    if (w.bottom < m.bottom)      py = w.bottom - PH - gap;   // taskbar at bottom
+    POINT ic = {(ir.left + ir.right) / 2, (ir.top + ir.bottom) / 2};
+    if (PtInRect(&w, ic)) {                              // icon sits in the hidden-icons flyout, not on the taskbar
+        RECT fr = ir;                                    // avoid covering the flyout window itself
+        HWND fw = GetAncestor(WindowFromPoint(ic), GA_ROOT);
+        if (fw) GetWindowRect(fw, &fr);
+        if (fr.top - PH - gap >= w.top)          py = fr.top - PH - gap;          // above the flyout
+        else if (fr.left - PW - gap >= w.left) { px = fr.left - PW - gap; py = fr.bottom - PH; }  // left of it
+        else if (fr.right + PW + gap <= w.right) { px = fr.right + gap; py = fr.bottom - PH; }    // right of it
+        else                                     py = fr.bottom + gap;            // below
+    }
+    else if (w.bottom < m.bottom)      py = w.bottom - PH - gap;   // taskbar at bottom
     else if (w.top > m.top)       py = w.top + gap;           // top
     else if (w.left > m.left)   { px = w.left + gap; py = ir.top; }
     else if (w.right < m.right) { px = w.right - PW - gap; py = ir.top; }
