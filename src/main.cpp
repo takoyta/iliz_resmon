@@ -1,4 +1,4 @@
-// CpuTray: CPU / memory / disk / network load in the tray. Pure WinAPI, no third-party libraries.
+// iliz resmon: CPU / memory / disk / network load in the tray. Pure WinAPI, no third-party libraries.
 // main: windows, message loop, menu, single instance + elevated takeover.
 #include "common.h"
 #include "appinfo.h"
@@ -34,7 +34,7 @@ static void ShowMenu(HWND h, int x, int y) {
     AppendMenuW(menu, MF_STRING | (autoOn ? MF_CHECKED : 0), IDM_AUTO, L"Запускать с Windows");
     if (!elev) AppendMenuW(menu, MF_STRING, IDM_ADMIN, L"Перезапустить от администратора");
     AppendMenuW(menu, MF_SEPARATOR, 0, 0);
-    AppendMenuW(menu, MF_STRING, IDM_ABOUT, L"О программе");
+    AppendMenuW(menu, MF_STRING, IDM_ABOUT, APP_NAME L" v" APP_VERSION);
     AppendMenuW(menu, MF_SEPARATOR, 0, 0);
     AppendMenuW(menu, MF_STRING, IDM_EXIT, L"Выход");
     SetForegroundWindow(h);
@@ -67,13 +67,13 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
 }
 
 int WINAPI wWinMain(HINSTANCE hi, HINSTANCE, PWSTR, int) {
-    wmQuit = RegisterWindowMessageW(L"CpuTrayQuit");
-    HANDLE mx = CreateMutexW(0, TRUE, L"CpuTrayOnce");
+    wmQuit = RegisterWindowMessageW(APP_ID L"_quit");
+    HANDLE mx = CreateMutexW(0, TRUE, APP_ID L"_once");
     if (!mx || GetLastError() == ERROR_ALREADY_EXISTS) {  // another instance (or one we can't open)
         if (!mx || !IsElevated()) return 0;
         DWORD r = WAIT_TIMEOUT;                          // ask it to quit; it may still be starting up
         for (int i = 0; i < 12 && r == WAIT_TIMEOUT; i++) {
-            HWND old = FindWindowW(L"CpuTray", 0);
+            HWND old = FindWindowW(APP_ID, 0);
             if (old) PostMessageW(old, wmQuit, 0, 0);
             r = WaitForSingleObject(mx, 250);
         }
@@ -84,14 +84,14 @@ int WINAPI wWinMain(HINSTANCE hi, HINSTANCE, PWSTR, int) {
     wmTaskbar = RegisterWindowMessageW(L"TaskbarCreated");
     AppInit();
 
-    WNDCLASSW wc = {0}; wc.lpfnWndProc = WndProc; wc.hInstance = hi; wc.lpszClassName = L"CpuTray";
+    WNDCLASSW wc = {0}; wc.lpfnWndProc = WndProc; wc.hInstance = hi; wc.lpszClassName = APP_ID;
     RegisterClassW(&wc);
-    wc.lpfnWndProc = PopProc; wc.lpszClassName = L"CpuTrayPop"; wc.hCursor = LoadCursorW(0, (LPCWSTR)IDC_ARROW);
+    wc.lpfnWndProc = PopProc; wc.lpszClassName = APP_ID L"_pop"; wc.hCursor = LoadCursorW(0, (LPCWSTR)IDC_ARROW);
     RegisterClassW(&wc);
     // Hidden top-level window (not HWND_MESSAGE): message-only windows miss the TaskbarCreated broadcast.
-    hMain = CreateWindowExW(WS_EX_TOOLWINDOW, L"CpuTray", L"", WS_POPUP, 0, 0, 0, 0, 0, 0, hi, 0);
+    hMain = CreateWindowExW(WS_EX_TOOLWINDOW, APP_ID, L"", WS_POPUP, 0, 0, 0, 0, 0, 0, hi, 0);
     ChangeWindowMessageFilterEx(hMain, wmQuit, MSGFLT_ALLOW, 0);
-    hPop = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE, L"CpuTrayPop", L"",
+    hPop = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE, APP_ID L"_pop", L"",
                            WS_POPUP, 0, 0, 10, 10, 0, 0, hi, 0);
 
     InitTray();

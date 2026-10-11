@@ -1,6 +1,7 @@
 // Shared constants and app-wide state (window handles, popup mode, tick clock).
 #pragma once
 #define WIN32_LEAN_AND_MEAN
+#include "appinfo.h"
 #include <windows.h>
 
 #define WM_TRAY (WM_APP + 1)

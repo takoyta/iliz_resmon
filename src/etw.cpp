@@ -11,8 +11,8 @@ static const GUID DiskIoGuid = {0x3d6fa8d4, 0xfe05, 0x11d0, {0x9d, 0xda, 0x00, 0
 static const GUID TcpGuid    = {0x9a280ac0, 0xc8e0, 0x11d1, {0x84, 0xe2, 0x00, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}};
 static const GUID UdpGuid    = {0xbf3a50c5, 0xa9c9, 0x4988, {0xa0, 0x05, 0x2d, 0xf0, 0xb7, 0xc8, 0x0f, 0x80}};
 static const GUID SessGuid   = {0x6c1a7f3e, 0x41b2, 0x4d8e, {0x9a, 0x51, 0x2e, 0x7c, 0x10, 0x5b, 0x33, 0xa4}};
-#define SESS_NAME L"CpuTray"
-#define OLD_SESS_NAME L"CpuTrayDiskIo"                    // name used up to 0.11.0
+#define SESS_NAME APP_ID
+#define OLD_SESS_NAME L"CpuTray"                          // name used up to 0.13.0
 // Kernel MOF event layouts (x64). DiskIo_TypeGroup1: Read=10, Write=11; DiskNumber@0, TransferSize@8,
 // IssuingThreadId@48. TcpIp/UdpIp_TypeGroup1: Send=10, Recv=11, SendIPV6=26, RecvIPV6=27; PID@0, size@4.
 #define OP_SEND    10
