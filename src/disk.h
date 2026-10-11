@@ -1,6 +1,6 @@
 #pragma once
+#include "common.h"
 #include <winioctl.h>
-#define MAXD 16
 typedef struct {
     int num; HANDLE h; WCHAR model[48]; WCHAR letters[27];
     DISK_PERFORMANCE p0;

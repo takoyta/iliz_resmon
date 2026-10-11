@@ -1,5 +1,7 @@
 // Tray icons: bar drawing and Shell_NotifyIcon (NOTIFYICON_VERSION_4).
 #include "common.h"
+#include <shellapi.h>
+#include "theme.h"
 #include "trayicon.h"
 #include "cpu.h"
 #include "disk.h"
@@ -33,7 +35,7 @@ static HICON End(CANVAS *c) {
 
 // Bars; when n exceeds what fits, neighbors are grouped: dark = group max, light = group avg.
 static HICON DrawBars(const int *vals, int n, COLORREF cAvg, COLORREF cMax) {
-    CANVAS c; Begin(&c, RGB(20, 30, 28)); int S = c.S;
+    CANVAS c; Begin(&c, C_ICON_BG); int S = c.S;
     if (n < 1) n = 1;
     int maxBars = S / 2; if (maxBars < 1) maxBars = 1;   // bars >= 1px + 1px gap
     int per = (n + maxBars - 1) / maxBars, nb = (n + per - 1) / per;
@@ -56,7 +58,7 @@ static HICON DrawBars(const int *vals, int n, COLORREF cAvg, COLORREF cMax) {
 }
 
 static HICON DrawNet() {                                 // two bars: rx blue, tx orange
-    CANVAS c; Begin(&c, RGB(18, 24, 32)); int S = c.S;
+    CANVAS c; Begin(&c, C_ICON_BG_NET); int S = c.S;
     int v[2] = {netRx > 100 ? 100 : netRx, netTx > 100 ? 100 : netTx};
     HBRUSH br[2] = {CreateSolidBrush(C_RX), CreateSolidBrush(C_TX)};
     for (int b = 0; b < 2; b++) {
@@ -69,7 +71,7 @@ static HICON DrawNet() {                                 // two bars: rx blue, t
 }
 
 static HICON DrawMem() {                                 // one wide bar: used %
-    CANVAS c; Begin(&c, RGB(20, 30, 28)); int S = c.S;
+    CANVAS c; Begin(&c, C_ICON_BG); int S = c.S;
     int hh = (mem.load * S + 50) / 100; if (mem.load > 0 && hh < 1) hh = 1;
     RECT r = {S / 8, S - hh, S - S / 8, S};
     HBRUSH b = CreateSolidBrush(C_MEM); FillRect(c.dc, &r, b); DeleteObject(b);

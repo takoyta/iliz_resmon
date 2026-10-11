@@ -21,7 +21,6 @@ static void PushL(HISTL *h, LONGLONG v) {
 }
 
 ULONG HistGetL(const HISTL *h, int i) { return h->v[(h->pos - h->n + i + HISTN) % HISTN]; }
-ULONGLONG HistSumL(const HISTL *h) { ULONGLONG s = 0; for (int i = 0; i < h->n; i++) s += h->v[i]; return s; }
 
 int HistGet(const HIST *h, int i) { return h->v[(h->pos - h->n + i + HISTN) % HISTN]; }
 

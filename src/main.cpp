@@ -1,37 +1,22 @@
-// CpuTray: CPU / disk / network load in the tray. Pure WinAPI, no third-party libraries.
+// CpuTray: CPU / memory / disk / network load in the tray. Pure WinAPI, no third-party libraries.
+// main: windows, message loop, menu, single instance + elevated takeover.
 #include "common.h"
 #include "appinfo.h"
-#include "cpu.h"
-#include "disk.h"
-#include "net.h"
-#include "mem.h"
-#include "history.h"
+#include <shellapi.h>
+#include "app.h"
 #include "etw.h"
 #include "procs.h"
-#include "sticky.h"
 #include "trayicon.h"
 #include "popup.h"
 #include "autostart.h"
 
-#define IDM_ABOUT 1002
-#define IDM_EXIT  1003
-#define IDM_AUTO  1004
-#define IDM_ADMIN 1005
+enum { IDM_AUTO = 1, IDM_ADMIN, IDM_ABOUT, IDM_EXIT };
 
 NtQSI_t NtQSI;
 HWND hMain, hPop;
 int popMode;
 ULONGLONG tickPrev, tickNow;
 static UINT wmTaskbar, wmQuit;
-
-static void OnTimer() {
-    tickPrev = tickNow; tickNow = GetTickCount64();
-    SampleCpu(); SampleMem(); SampleDisks(); SampleNet();
-    EtwTick(); SampleProcs(); StickyTick();
-    PushHistory();
-    UpdateIcons();
-    if (popMode) PopupTick();
-}
 
 static void ShowAbout(HWND h) {
     WCHAR t[256];
@@ -64,7 +49,7 @@ static void ShowMenu(HWND h, int x, int y) {
 
 static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
     switch (m) {
-    case WM_TIMER: OnTimer(); return 0;
+    case WM_TIMER: AppTick(); return 0;
     case WM_TRAY:                                        // NOTIFYICON_VERSION_4: event in LOWORD(l), icon id in HIWORD(l)
         switch (LOWORD(l)) {
         case NIN_POPUPOPEN:  ShowPopup(HIWORD(l)); break;
@@ -97,7 +82,7 @@ int WINAPI wWinMain(HINSTANCE hi, HINSTANCE, PWSTR, int) {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     NtQSI = (NtQSI_t)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQuerySystemInformation");
     wmTaskbar = RegisterWindowMessageW(L"TaskbarCreated");
-    InitCpu(); InitDisks(); EtwInit(); EtwStart();
+    AppInit();
 
     WNDCLASSW wc = {0}; wc.lpfnWndProc = WndProc; wc.hInstance = hi; wc.lpszClassName = L"CpuTray";
     RegisterClassW(&wc);
@@ -111,7 +96,7 @@ int WINAPI wWinMain(HINSTANCE hi, HINSTANCE, PWSTR, int) {
 
     InitTray();
     tickNow = GetTickCount64();
-    SampleCpu(); SampleMem(); SampleNet(); SampleProcs();   // baseline: lists are ready after the first tick
+    AppSample();                                         // baseline: lists are ready after the first tick
     AddIcons();
     SetTimer(hMain, 1, 1000, 0);
     MSG msg;

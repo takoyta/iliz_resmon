@@ -1,5 +1,4 @@
 // Text formatting helpers (rates, sizes).
-#include "common.h"
 #include "format.h"
 
 void FmtRate(WCHAR *o, LONGLONG b) {
@@ -9,21 +8,17 @@ void FmtRate(WCHAR *o, LONGLONG b) {
     else lstrcpyW(o, L"0");
 }
 
-void FmtSize(WCHAR *o, ULONGLONG b) {
-    ULONGLONG g = b >> 30;
-    if (g >= 1024) wsprintfW(o, L"%d.%d ТБ", (int)(g / 1024), (int)(g % 1024 * 10 / 1024));
-    else wsprintfW(o, L"%d ГБ", (int)g);
-}
-
-void FmtMB(WCHAR *o, ULONG64 b) {
-    if (b >> 30) FmtSize(o, b); else wsprintfW(o, L"%d МБ", (int)(b >> 20));
+static void Dec(WCHAR *o, ULONGLONG b, int sh, const WCHAR *unit) {   // "X.Y unit" for b / 2^sh
+    wsprintfW(o, L"%d.%d %s", (int)(b >> sh), (int)((b & ((1ull << sh) - 1)) * 10 >> sh), unit);
 }
 
 void FmtBytes(WCHAR *o, ULONGLONG b) {
-    if (b < (1ull << 20)) wsprintfW(o, L"%d КБ", (int)(b >> 10)); else FmtMem(o, b);
+    if (b < (1ull << 20)) wsprintfW(o, L"%d КБ", (int)(b >> 10));
+    else if (b < (1ull << 30)) wsprintfW(o, L"%d МБ", (int)(b >> 20));
+    else if (b < (1ull << 40)) Dec(o, b, 30, L"ГБ");
+    else Dec(o, b, 40, L"ТБ");
 }
 
-void FmtMem(WCHAR *o, ULONGLONG b) {
-    if (b < (1ull << 30)) wsprintfW(o, L"%d МБ", (int)(b >> 20));
-    else wsprintfW(o, L"%d.%d ГБ", (int)(b >> 30), (int)((b & ((1ull << 30) - 1)) * 10 >> 30));
+void FmtSize(WCHAR *o, ULONGLONG b) {
+    if (b < (1ull << 40)) wsprintfW(o, L"%d ГБ", (int)(b >> 30)); else Dec(o, b, 40, L"ТБ");
 }

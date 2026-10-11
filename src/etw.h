@@ -1,5 +1,5 @@
 #pragma once
-#include "disk.h"
+#include "common.h"
 #define DTOPN 4
 typedef struct { DWORD pid; LONGLONG v; } DTOP;          // per-disk top, bytes/s
 typedef struct { DWORD pid; LONGLONG rx, tx; ULONGLONG totRx, totTx; } NTOP;   // rates bytes/s, totals since start

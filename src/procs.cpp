@@ -13,7 +13,7 @@ typedef struct {                                         // class 5 (x64 layout)
 #define SPI_READ_BYTES  232                              // ReadTransferCount offset (x64)
 #define SPI_WRITE_BYTES 240                              // WriteTransferCount offset (x64)
 
-typedef struct { DWORD pid; LONGLONG create, t, io; WCHAR name[28]; } PREC;
+typedef struct { DWORD pid; LONGLONG create, t, io; WCHAR name[NAME_LEN]; } PREC;
 static PREC *pPrev, *pCur; static int nPrev, cap;        // snapshots, cap entries each
 static int *hIdx; static int hMask;                      // pid -> index into pPrev (open addressing, -1 empty)
 static BYTE *pbuf; static ULONG pbufSize;
@@ -37,7 +37,7 @@ static void TopInsert(int m, const SPI *s, LONGLONG v) {
     TOP *t = top[m]; int k = nTop[m] < TOPN ? nTop[m]++ : TOPN;
     while (k > 0 && t[k - 1].v < v) { if (k < TOPN) t[k] = t[k - 1]; k--; }
     if (k >= TOPN) return;
-    CopyName(t[k].name, s, 39); t[k].pid = (DWORD)(ULONG_PTR)s->Pid;
+    CopyName(t[k].name, s, NAME_LEN - 1); t[k].pid = (DWORD)(ULONG_PTR)s->Pid;
     t[k].v = v;
 }
 
@@ -90,7 +90,7 @@ void SampleProcs() {
             r->pid = (DWORD)(ULONG_PTR)s->Pid; r->create = s->Create.QuadPart;
             r->t = s->User.QuadPart + s->Kernel.QuadPart;
             r->io = *(LONGLONG*)(p + SPI_READ_BYTES) + *(LONGLONG*)(p + SPI_WRITE_BYTES);
-            CopyName(r->name, s, 27);
+            CopyName(r->name, s, NAME_LEN - 1);
             TopInsert(TM_MEM, s, s->PrivWs.QuadPart);    // instantaneous, no baseline
             const PREC *o = haveBase ? FindPrev(r->pid) : 0;
             if (o && o->create == r->create) {

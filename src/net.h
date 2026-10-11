@@ -1,4 +1,6 @@
 #pragma once
+#include "common.h"
+#include <winsock2.h>
 #include <ws2ipdef.h>
 #include <iphlpapi.h>
 #define MAXN 8

@@ -4,6 +4,7 @@
 #include <evntrace.h>
 #include <evntcons.h>
 #include "etw.h"
+#include "disk.h"
 
 static const GUID DiskIoGuid = {0x3d6fa8d4, 0xfe05, 0x11d0, {0x9d, 0xda, 0x00, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}};
 static const GUID TcpGuid    = {0x9a280ac0, 0xc8e0, 0x11d1, {0x84, 0xe2, 0x00, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}};
@@ -11,6 +12,14 @@ static const GUID UdpGuid    = {0xbf3a50c5, 0xa9c9, 0x4988, {0xa0, 0x05, 0x2d, 0
 static const GUID SessGuid   = {0x6c1a7f3e, 0x41b2, 0x4d8e, {0x9a, 0x51, 0x2e, 0x7c, 0x10, 0x5b, 0x33, 0xa4}};
 #define SESS_NAME L"CpuTray"
 #define OLD_SESS_NAME L"CpuTrayDiskIo"                    // name used up to 0.11.0
+// Kernel MOF event layouts (x64). DiskIo_TypeGroup1: Read=10, Write=11; DiskNumber@0, TransferSize@8,
+// IssuingThreadId@48. TcpIp/UdpIp_TypeGroup1: Send=10, Recv=11, SendIPV6=26, RecvIPV6=27; PID@0, size@4.
+#define OP_SEND    10
+#define OP_RECV    11
+#define OP_SEND6   26
+#define OP_RECV6   27
+#define DISK_EV_MIN 52
+#define DISK_EV_TID 48
 #define AGGN 1024                                        // per-tick hash tables (power of 2)
 #define NAGGN 1024
 #define CUMN 2048                                        // cumulative per-process net totals
@@ -57,10 +66,10 @@ static DWORD PidOfThread(DWORD tid) {
 
 static void OnNet(PEVENT_RECORD e) {                     // TcpIp/UdpIp Send/Recv, IPv4 10/11, IPv6 26/27
     int op = e->EventHeader.EventDescriptor.Opcode;
-    if ((op != 10 && op != 11 && op != 26 && op != 27) || e->UserDataLength < 8) return;
+    if ((op != OP_SEND && op != OP_RECV && op != OP_SEND6 && op != OP_RECV6) || e->UserDataLength < 8) return;
     BYTE *d = (BYTE*)e->UserData;
     DWORD key = *(ULONG*)d + 1; LONGLONG size = *(ULONG*)(d + 4);
-    int rx = op == 11 || op == 27;
+    int rx = op == OP_RECV || op == OP_RECV6;
     EnterCriticalSection(&cs);
     for (UINT h = Hash(key) & (NAGGN - 1), k = 0; k < NAGGN; k++, h = (h + 1) & (NAGGN - 1)) {
         NAGG *g = &nagg[h];
@@ -72,9 +81,9 @@ static void OnNet(PEVENT_RECORD e) {                     // TcpIp/UdpIp Send/Rec
 
 static void OnDisk(PEVENT_RECORD e) {                    // DiskIo Read/Write
     int op = e->EventHeader.EventDescriptor.Opcode;
-    if ((op != 10 && op != 11) || e->UserDataLength < 52) return;
+    if ((op != OP_SEND && op != OP_RECV) || e->UserDataLength < DISK_EV_MIN) return;   // same opcodes: Read/Write
     BYTE *d = (BYTE*)e->UserData;
-    int disk = *(ULONG*)d; LONGLONG size = *(ULONG*)(d + 8); DWORD tid = *(ULONG*)(d + 48);
+    int disk = *(ULONG*)d; LONGLONG size = *(ULONG*)(d + 8); DWORD tid = *(ULONG*)(d + DISK_EV_TID);
     DWORD pid = tid ? PidOfThread(tid) : e->EventHeader.ProcessId;
     if (pid == 0xFFFFFFFF) pid = 0;
     DWORD key = pid + 1;

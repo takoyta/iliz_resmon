@@ -1,4 +1,5 @@
 #pragma once
+#include "common.h"
 void ShowPopup(int id);                    // on NIN_POPUPOPEN
 void HidePopup();
 void PopupTick();                          // once per second while open
