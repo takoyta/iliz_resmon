@@ -1,5 +1,6 @@
 #pragma once
+#include "common.h"
 BOOL IsElevated();
-BOOL AutostartEnabled();                   // scheduled task "CpuTray" exists
-void AutostartSet(BOOL on);                // create (XML, highest rights) / delete; UAC prompt if not elevated
+BOOL AutostartEnabled();                   // HKCU\...\Run value "CpuTray" exists
+void AutostartSet(BOOL on);                // write quoted exe path / delete the value (no admin needed)
 void RelaunchElevated();                   // "runas" self; the new instance takes over
