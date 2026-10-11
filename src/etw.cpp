@@ -22,16 +22,23 @@ static const GUID SessGuid   = {0x6c1a7f3e, 0x41b2, 0x4d8e, {0x9a, 0x51, 0x2e, 0
 #define DISK_EV_MIN 52
 #define DISK_EV_TID 48
 #define AGGN 1024                                        // per-tick hash tables (power of 2)
-#define NAGGN 1024
+#define NAGGN 512
 #define CUMN 2048                                        // cumulative per-process net totals
 #define THN 4096
 
 // Per-tick tables, filled by the trace thread under cs, swapped out each tick. key 0 = empty slot.
 typedef struct { DWORD key; int disk; LONGLONG bytes; } AGG;       // key = pid + 1
 typedef struct { DWORD key; LONGLONG rx, tx; } NAGG;
-static AGG agg[AGGN], snap[AGGN]; static int nAgg;
-static NAGG nagg[NAGGN], nsnap[NAGGN]; static int nNagg;
-typedef struct { DWORD key; LONGLONG create; ULONGLONG rx, tx, last; LONGLONG rps, tps; WCHAR name[NAME_LEN]; } CUM;   // main thread only; name = last known
+// Double-buffered: the trace thread writes *agg / *nagg; each tick the pointers swap under cs and the
+// drained table is read and cleared outside the lock.
+static AGG aggT[2][AGGN], *agg = aggT[0], *snap = aggT[1]; static int nAgg;
+static NAGG naggT[2][NAGGN], *nagg = naggT[0], *nsnap = naggT[1]; static int nNagg;
+typedef struct {                                         // main thread only
+    DWORD key, last;                                     // last = tickSeq of last traffic
+    LONGLONG create; ULONGLONG rx, tx; LONGLONG rps, tps;
+    WCHAR name[NAME_LEN];                                // last known (survives process exit)
+} CUM;
+static DWORD tickSeq;                                    // EtwTick counter (~seconds)
 static CUM cum[CUMN]; static int nCum;
 static CRITICAL_SECTION cs;
 static DWORD thTid[THN], thPid[THN], thAt[THN];          // thread -> process cache + lookup time in s (trace thread only)
@@ -99,8 +106,8 @@ static void OnDisk(PEVENT_RECORD e) {                    // DiskIo Read/Write
 
 static void WINAPI OnEvent(PEVENT_RECORD e) {
     const GUID &g = e->EventHeader.ProviderId;
-    if (IsEqualGUID(g, TcpGuid) || IsEqualGUID(g, UdpGuid)) OnNet(e);
-    else if (IsEqualGUID(g, DiskIoGuid)) OnDisk(e);
+    if (InlineIsEqualGUID(g, TcpGuid) || InlineIsEqualGUID(g, UdpGuid)) OnNet(e);   // Inline*: no memcmp (no CRT)
+    else if (InlineIsEqualGUID(g, DiskIoGuid)) OnDisk(e);
 }
 
 static DWORD WINAPI TraceThread(LPVOID) {
@@ -178,7 +185,7 @@ void EtwStart() {
     lf.EventRecordCallback = OnEvent;
     etwTrace = OpenTraceW(&lf);
     if (etwTrace == INVALID_PROCESSTRACE_HANDLE) { ControlTraceW(0, SESS_NAME, Props(), EVENT_TRACE_CONTROL_STOP); etwErr = GetLastError(); etwState = ETW_DENIED; return; }
-    ZeroMemory(agg, sizeof(agg)); ZeroMemory(nagg, sizeof(nagg)); nAgg = nNagg = 0;   // no thread running now
+    ZeroMemory(aggT, sizeof(aggT)); ZeroMemory(naggT, sizeof(naggT)); nAgg = nNagg = 0;   // no thread running now
     etwThread = CreateThread(0, 0, TraceThread, 0, 0, 0);
     if (!etwThread) { etwErr = GetLastError(); Cleanup(ETW_DENIED); return; }
     etwOn = 1; etwState = ETW_ON; etwErr = 0; etwLost = 0; etwTicks = 0;
@@ -211,22 +218,34 @@ static CUM *CumFind(DWORD key) {                         // open addressing; ret
     return &cum[h];
 }
 
-static void CumEvict() {                                 // drop the oldest-active quarter (prefer dead), rehash
-    static CUM all[CUMN]; int n = 0;
-    for (int i = 0; i < CUMN; i++) if (cum[i].key) {
-        all[n] = cum[i];
-        if (CreateTime(all[n].key - 1) != all[n].create) all[n].last = 0;   // dead or reused: evict first
-        n++;
+static void CumDel(int i) {                              // linear-probing delete with backward shift
+    for (int j = i;;) {
+        j = (j + 1) & (CUMN - 1);
+        if (!cum[j].key) break;
+        int h = Hash(cum[j].key) & (CUMN - 1);
+        if (i <= j ? (i < h && h <= j) : (i < h || h <= j)) continue;   // home slot in (i, j]: stays
+        cum[i] = cum[j]; i = j;
     }
-    for (int i = 1; i < n; i++) { CUM t = all[i]; int k = i; while (k > 0 && all[k - 1].last < t.last) { all[k] = all[k - 1]; k--; } all[k] = t; }
-    n = n * 3 / 4;
-    ZeroMemory(cum, sizeof(cum)); nCum = 0;
-    for (int i = 0; i < n; i++) { *CumFind(all[i].key) = all[i]; nCum++; }
+    cum[i].key = 0; nCum--;
+}
+
+static void CumEvict() {                                 // drop the oldest-active quarter, dead/reused first
+    static WORD idx[CUMN]; int n = 0;
+    for (int i = 0; i < CUMN; i++) if (cum[i].key) {
+        if (CreateTime(cum[i].key - 1) != cum[i].create) cum[i].last = 0;
+        int k = n++;                                     // insertion sort by last asc
+        while (k > 0 && cum[idx[k - 1]].last > cum[i].last) { idx[k] = idx[k - 1]; k--; }
+        idx[k] = (WORD)i;
+    }
+    int drop = n / 4; if (!drop) return;
+    DWORD T = cum[idx[drop - 1]].last;                   // evict entries with last <= T (at most drop)
+    for (int i = 0; i < CUMN && drop; i++)
+        while (cum[i].key && cum[i].last <= T && drop) { CumDel(i); drop--; }
 }
 
 static CUM *CumAdd(DWORD key, LONGLONG rx, LONGLONG tx) {
     CUM *c = CumFind(key);
-    if (c->key && tickNow - c->last > 10000) {          // idle a while: check for pid reuse
+    if (c->key && tickSeq - c->last > 10) {             // idle ~10 s: check for pid reuse
         LONGLONG ct = CreateTime(key - 1);
         if (ct != c->create) { c->rx = c->tx = 0; c->create = ct; c->name[0] = 0; }
     }
@@ -234,7 +253,7 @@ static CUM *CumAdd(DWORD key, LONGLONG rx, LONGLONG tx) {
         if (nCum >= CUMN * 3 / 4) { CumEvict(); c = CumFind(key); }
         c->key = key; c->create = CreateTime(key - 1); c->rx = c->tx = 0; c->name[0] = 0; nCum++;
     }
-    c->rx += rx; c->tx += tx; c->last = tickNow;
+    c->rx += rx; c->tx += tx; c->last = tickSeq;
     return c;
 }
 
@@ -247,7 +266,7 @@ static void NetTick(LONGLONG dt) {                       // fold this tick into 
     nNtop = 0;
     for (int i = 0; i < CUMN; i++) if (cum[i].key) {
         CUM *c = &cum[i];
-        if (c->last != tickNow) c->rps = c->tps = 0;     // idle this tick
+        if (c->last != tickSeq) c->rps = c->tps = 0;     // idle this tick
         if (!c->rx && !c->tx) continue;
         int k = nNtop < TOPN ? nNtop++ : TOPN;
         while (k > 0 && (ntop[k - 1].totRx < c->rx || (ntop[k - 1].totRx == c->rx && ntop[k - 1].totTx < c->tx))) {
@@ -257,13 +276,13 @@ static void NetTick(LONGLONG dt) {                       // fold this tick into 
         if (k >= TOPN) continue;
         NTOP *t = &ntop[k];
         t->pid = c->key - 1; t->rx = c->rps; t->tx = c->tps; t->totRx = c->rx; t->totTx = c->tx;
-        t->live = tickNow - c->last < NET_IDLE_MS;
+        t->live = tickSeq - c->last < NET_IDLE_MS / 1000;
         lstrcpynW(t->name, c->name[0] ? c->name : NameOf(t->pid), NAME_LEN);
     }
 }
 
 void EtwNames() {                                        // keep names so exited processes stay readable
-    for (int i = 0; i < CUMN; i++) if (cum[i].key && cum[i].last == tickNow) {
+    for (int i = 0; i < CUMN; i++) if (cum[i].key && cum[i].last == tickSeq) {
         const WCHAR *n = NameOf(cum[i].key - 1);
         if (n[0] != '?') lstrcpynW(cum[i].name, n, NAME_LEN);
     }
@@ -281,10 +300,12 @@ void EtwTick() {
     }
     if (!etwOn) { for (int i = 0; i < ndisk; i++) ndtop[i] = 0; if (now >= etwRetryAt) EtwStart(); return; }   // net totals kept
     EnterCriticalSection(&cs);
-    CopyMemory(snap, agg, sizeof(agg)); ZeroMemory(agg, sizeof(agg)); nAgg = 0;
-    CopyMemory(nsnap, nagg, sizeof(nagg)); ZeroMemory(nagg, sizeof(nagg)); nNagg = 0;
+    AGG *a = agg; agg = snap; snap = a; nAgg = 0;
+    NAGG *g = nagg; nagg = nsnap; nsnap = g; nNagg = 0;
     LeaveCriticalSection(&cs);
     LONGLONG dt = TickDt();
+    tickSeq++;
     DiskTick(dt); NetTick(dt);
+    ZeroMemory(snap, sizeof(aggT[0])); ZeroMemory(nsnap, sizeof(naggT[0]));   // ready for the next swap
     etwTicks++;
 }
