@@ -169,17 +169,18 @@ static BOOL Alive() {                                    // trace thread running
 // Stop leftover sessions from killed instances: our session GUID must be unique, so an orphan
 // under an old name (CpuTrayDiskIo, CpuTray) makes StartTrace fail with a name collision.
 static void StopOrphans() {
-    enum { N = 32, PSZ = sizeof(EVENT_TRACE_PROPERTIES) + 2 * 512 * sizeof(WCHAR) };
+    enum { N = 64, PSZ = sizeof(EVENT_TRACE_PROPERTIES) + 2 * 256 * sizeof(WCHAR) };
     static BYTE buf[N][PSZ]; EVENT_TRACE_PROPERTIES *pp[N];
     ZeroMemory(buf, sizeof(buf));
     for (int i = 0; i < N; i++) {
         pp[i] = (EVENT_TRACE_PROPERTIES*)buf[i];
         pp[i]->Wnode.BufferSize = PSZ;
         pp[i]->LoggerNameOffset = sizeof(EVENT_TRACE_PROPERTIES);
-        pp[i]->LogFileNameOffset = sizeof(EVENT_TRACE_PROPERTIES) + 512 * sizeof(WCHAR);
+        pp[i]->LogFileNameOffset = sizeof(EVENT_TRACE_PROPERTIES) + 256 * sizeof(WCHAR);
     }
     ULONG n = 0;
-    if (QueryAllTracesW(pp, N, &n) != ERROR_SUCCESS && !n) return;
+    QueryAllTracesW(pp, N, &n);                       // ERROR_MORE_DATA still fills N entries
+    if (n > N) n = N;                                    // n is the total count, may exceed the array
     for (ULONG i = 0; i < n; i++) {
         const WCHAR *name = (const WCHAR*)((BYTE*)pp[i] + pp[i]->LoggerNameOffset);
         if (InlineIsEqualGUID(pp[i]->Wnode.Guid, SessGuid) || !lstrcmpiW(name, L"CpuTrayDiskIo") || !lstrcmpiW(name, OLD_SESS_NAME))
