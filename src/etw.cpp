@@ -166,12 +166,32 @@ static BOOL Alive() {                                    // trace thread running
     return TRUE;
 }
 
+// Stop leftover sessions from killed instances: our session GUID must be unique, so an orphan
+// under an old name (CpuTrayDiskIo, CpuTray) makes StartTrace fail with a name collision.
+static void StopOrphans() {
+    enum { N = 32, PSZ = sizeof(EVENT_TRACE_PROPERTIES) + 2 * 512 * sizeof(WCHAR) };
+    static BYTE buf[N][PSZ]; EVENT_TRACE_PROPERTIES *pp[N];
+    ZeroMemory(buf, sizeof(buf));
+    for (int i = 0; i < N; i++) {
+        pp[i] = (EVENT_TRACE_PROPERTIES*)buf[i];
+        pp[i]->Wnode.BufferSize = PSZ;
+        pp[i]->LoggerNameOffset = sizeof(EVENT_TRACE_PROPERTIES);
+        pp[i]->LogFileNameOffset = sizeof(EVENT_TRACE_PROPERTIES) + 512 * sizeof(WCHAR);
+    }
+    ULONG n = 0;
+    if (QueryAllTracesW(pp, N, &n) != ERROR_SUCCESS && !n) return;
+    for (ULONG i = 0; i < n; i++) {
+        const WCHAR *name = (const WCHAR*)((BYTE*)pp[i] + pp[i]->LoggerNameOffset);
+        if (InlineIsEqualGUID(pp[i]->Wnode.Guid, SessGuid) || !lstrcmpiW(name, L"CpuTrayDiskIo") || !lstrcmpiW(name, OLD_SESS_NAME))
+            ControlTraceW(0, name, Props(), EVENT_TRACE_CONTROL_STOP);
+    }
+}
+
 void EtwStart() {
     if (etwOn) return;
     etwRetryAt = GetTickCount64() + ETW_RETRY_MS;
     if (!ThreadDone()) return;                           // previous trace thread still draining
-    static int oldStopped;
-    if (!oldStopped) { oldStopped = 1; ControlTraceW(0, OLD_SESS_NAME, Props(), EVENT_TRACE_CONTROL_STOP); }
+    StopOrphans();
     EnableProfilePrivilege();
     ULONG st = StartTraceW(&etwSess, SESS_NAME, Props());
     if (st == ERROR_ALREADY_EXISTS) {                    // orphan from a killed instance
