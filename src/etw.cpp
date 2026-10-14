@@ -279,6 +279,10 @@ static CUM *CumAdd(DWORD key, LONGLONG rx, LONGLONG tx) {
 }
 
 static void NetTick(LONGLONG dt) {                       // fold this tick into totals, then top 10 by total rx
+    static WORD day;                                     // per-process totals cover the current local day
+    SYSTEMTIME st; GetLocalTime(&st);
+    if (day && day != st.wDay) { ZeroMemory(cum, sizeof(cum)); nCum = 0; }
+    day = st.wDay;
     for (int i = 0; i < NAGGN; i++) if (nsnap[i].key) {
         NAGG *g = &nsnap[i];
         CUM *c = CumAdd(g->key, g->rx, g->tx);
