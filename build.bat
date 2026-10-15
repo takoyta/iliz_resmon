@@ -5,6 +5,12 @@ if not defined VSINSTALL set VSINSTALL=C:\Program Files (x86)\Microsoft Visual S
 call "%VSINSTALL%\VC\Auxiliary\Build\vcvars64.bat" >nul || exit /b 1
 cd /d "%ROOT%"
 if not exist bin mkdir bin
+rem Stop running copies so their exe can be overwritten (an elevated one needs build.bat run as admin).
+taskkill /f /im iliz_resmon.exe >nul 2>&1
+taskkill /f /im iliz_resmon_config.exe >nul 2>&1
+ping -n 2 127.0.0.1 >nul
+del /q bin\iliz_resmon.old.exe 2>nul
+if exist bin\iliz_resmon.exe 2>nul (call;>>bin\iliz_resmon.exe) || (echo iliz_resmon.exe is still running: close it or run build.bat as administrator. & exit /b 1)
 rem VERSIONINFO (ProductVersion is what iliz_updater compares with the release tag).
 rc /nologo /Isrc /foiliz_resmon.res src\app.rc || exit /b 1
 rem No CRT: own entry point and memset/memcpy/memcmp in src\nocrt.cpp. /Zl: no default lib names in .obj.
