@@ -1,46 +1,52 @@
 # iliz resmon
 
-Крошечный монитор ресурсов для системного трея Windows: CPU, память, диски и сеть. Чистый WinAPI на C++, без CRT и сторонних библиотек: exe около 35 КБ, потребление памяти минимальное.
+English | [Русский](README.ru.md)
 
-<!-- screenshots -->
+A tiny resource monitor for the Windows system tray: CPU, memory, disks and network. Pure WinAPI C++ with no CRT and no third-party libraries. The exe is about 35 KB and uses very little memory.
 
-## Возможности
+<p>
+<img src="docs/cpu.png" height="300"> <img src="docs/mem.png" height="300"> <img src="docs/disk.png" height="300"> <img src="docs/net.png" height="300">
+</p>
 
-- **CPU**: иконка со столбиком на каждое ядро (если ядер больше, чем пикселей, они группируются). Во всплывающем окне: загрузка по ядрам, график за 5 минут (средняя загрузка и самое загруженное ядро), топ-10 процессов.
-- **Память**: занято/доступно, кэш, commit, график за 5 минут, топ-10 процессов по приватному рабочему набору.
-- **Диски**: по физическим устройствам с буквами томов (`Samsung SSD 970 [C: D:]`): активность, чтение/запись, очередь, свободное место; процессы, которые нагружают каждый диск.
-- **Сеть**: скорость приёма и отдачи, топ-10 процессов по трафику с текущей скоростью и объёмом за сегодня (обнуляется в 00:00).
-- Процессы, выпавшие из топа, ещё 5 секунд показываются серым, чтобы успеть их разглядеть.
-- Корректная работа при любом масштабе экрана (DPI-aware v2), правильное позиционирование всплывающих окон, в том числе для иконок в области скрытых значков.
-- Автозапуск через `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, без прав администратора.
+The UI is currently in Russian.
 
-## Права администратора
+## Features
 
-Списки процессов по дискам и сети собираются через трассировку ядра (ETW), а она работает только с правами администратора. Без них программа показывает всё остальное. Пункт меню «Перезапустить от администратора» запускает копию с правами, и она сама закрывает экземпляр без прав.
+- **CPU**: a tray icon with one bar per core (cores are grouped when there are more cores than pixels). The popup shows a 5-minute graph (average load and the busiest core) and the top 10 processes.
+- **Memory**: used and available memory, cache, commit charge, a 5-minute graph, and the top 10 processes by private working set.
+- **Disks**: one entry per physical drive with its volume letters (`Samsung SSD 980 PRO [C:]`): activity, read and write speed, queue length, free space, and the processes loading each drive.
+- **Network**: download and upload speed, a 5-minute graph, and the top 10 processes by traffic with their current speed and today's totals (reset at midnight).
+- Processes that drop out of a top list stay visible in grey for 5 seconds, so you have time to see what it was.
+- DPI-aware (per-monitor v2), with correct popup placement, including icons in the hidden-icons flyout.
+- Autostart through `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, with no admin rights needed.
 
-Некоторые античиты (например, Easy Anti-Cheat) блокируют трассировку ядра, пока запущена игра. Программа повторяет попытку каждые 15 секунд и восстанавливается сама после выхода из игры.
+## Administrator rights
 
-## Сборка
+Per-process disk and network statistics come from kernel tracing (ETW), which needs administrator rights. Without them everything else still works. The "Restart as administrator" menu item starts an elevated copy, which closes the non-elevated instance by itself.
 
-Нужны Visual Studio 2022 Build Tools с компонентом C++. Запустите `build.bat`: он собирает все `src\*.cpp` в `iliz_resmon.exe` в корне проекта. Если Build Tools установлены в другое место, задайте путь в переменной `VSINSTALL`.
+Some anti-cheat systems (for example, Easy Anti-Cheat) block kernel tracing while a game is running. The program retries every 15 seconds and recovers on its own after you exit the game.
 
-## Устройство кода (`src/`)
+## Building
 
-| Файл | Назначение |
+You need Visual Studio 2022 Build Tools with the C++ workload. Run `build.bat`: it compiles all `src\*.cpp` into `iliz_resmon.exe` in the project root. If Build Tools are installed elsewhere, set the `VSINSTALL` environment variable to their path.
+
+## Code layout (`src/`)
+
+| File | Purpose |
 |---|---|
-| `main.cpp` | Точка входа, окно, меню, единственный экземпляр, передача управления экземпляру с правами |
-| `app.cpp` | Ежесекундный цикл: сбор данных, обработка, отрисовка |
-| `cpu.cpp`, `mem.cpp`, `disk.cpp`, `net.cpp` | Сбор метрик |
-| `procs.cpp` | Снимок процессов (`NtQuerySystemInformation`): топы по CPU, памяти, вводу-выводу |
-| `etw.cpp` | Трассировка ядра: процессы по дискам и сети, автоматический перезапуск сессии |
-| `history.cpp` | История за 5 минут для графиков |
-| `sticky.cpp` | Выпавшие из топа строки, которые ещё показываются серым |
-| `trayicon.cpp` | Отрисовка иконок и работа с треем |
-| `popup.cpp`, `views.cpp`, `draw.cpp`, `theme.h` | Всплывающие окна: размещение, содержимое, примитивы рисования, цвета |
-| `autostart.cpp` | Проверка прав, перезапуск с правами, автозапуск |
-| `format.cpp` | Форматирование скоростей и размеров |
-| `nocrt.cpp` | Сборка без CRT: точка входа, `memset`/`memcpy`/`memcmp`, окно с ошибкой при падении |
+| `main.cpp` | Entry point, window, menu, single instance, handoff to the elevated instance |
+| `app.cpp` | Once-a-second loop: sample, process, render |
+| `cpu.cpp`, `mem.cpp`, `disk.cpp`, `net.cpp` | Metric sampling |
+| `procs.cpp` | Process snapshot (`NtQuerySystemInformation`): top lists by CPU, memory and I/O |
+| `etw.cpp` | Kernel tracing: per-process disk and network activity, automatic session recovery |
+| `history.cpp` | 5-minute history for the graphs |
+| `sticky.cpp` | Rows that dropped out of a top list and stay visible in grey |
+| `trayicon.cpp` | Icon drawing and tray handling |
+| `popup.cpp`, `views.cpp`, `draw.cpp`, `theme.h` | Popups: placement, content, drawing primitives, colors |
+| `autostart.cpp` | Elevation check, restart as administrator, autostart |
+| `format.cpp` | Speed and size formatting |
+| `nocrt.cpp` | CRT-free build: entry point, `memset`/`memcpy`/`memcmp`, crash dialog |
 
-## Лицензия
+## License
 
 [MIT](LICENSE)
