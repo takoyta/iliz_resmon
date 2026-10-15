@@ -16,14 +16,16 @@ The UI is in English or Russian, picked from the Windows display language (Russi
 - **Memory**: used and available memory, cache, commit charge, a 5-minute graph, and the top 10 processes by private working set.
 - **Disks**: one entry per physical drive with its volume letters (`Samsung SSD 980 PRO [C:]`): activity, read and write speed, queue length, free space, and the processes loading each drive.
 - **Network**: download and upload speed, a 5-minute graph, and the top 10 processes by traffic with their current speed and today's totals (reset at midnight).
+- **GPU** (off by default, enable it in the configurator): load from the `GPU Engine` performance counters (busiest engine type, as in Task Manager), a scrolling graph icon, and a popup with a 5-minute graph and the busiest engine types. No admin rights needed.
+- **History window**: a left click on any tray icon opens a resizable window with the last 60 minutes of that metric (one sample per second, peak values per pixel column). Esc closes it.
 - Processes that drop out of a top list stay visible in grey for 5 seconds, so you have time to see what it was.
 - DPI-aware (per-monitor v2), with correct popup placement, including icons in the hidden-icons flyout.
-- **Settings**: the tray menu item **Settings…** opens `iliz_resmon_config.exe`, a small dialog where you choose which of the four tray icons to show and whether to start with Windows. Changes apply immediately; at least one icon stays on.
+- **Settings**: the tray menu item **Settings…** opens `iliz_resmon_config.exe`, a small dialog where you choose which tray icons to show (CPU, memory, disks, network, GPU), the update interval (0.5, 1 or 2 s) and whether to start with Windows. Changes apply immediately; at least one icon stays on.
 - Autostart (the **Start with Windows** checkbox in the configurator) through `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, with no admin rights needed.
 
 ## Administrator rights
 
-Per-process disk and network statistics come from kernel tracing (ETW), which needs administrator rights. Without them everything else still works. The "Restart as administrator" menu item starts an elevated copy, which closes the non-elevated instance by itself.
+Per-process disk and network statistics come from kernel tracing (ETW), which needs administrator rights. Without them everything else still works: the network popup shows adapter totals and a note that per-process traffic needs administrator rights (the same note is in the tooltip and the tray menu), and the disk popup lists processes by total I/O instead. The "Restart as administrator" menu item starts an elevated copy, which closes the non-elevated instance by itself.
 
 Some anti-cheat systems (for example, Easy Anti-Cheat) block kernel tracing while a game is running. The program retries every 15 seconds and recovers on its own after you exit the game.
 
@@ -37,9 +39,11 @@ cpu=1
 mem=1
 disk=1
 net=1
+gpu=0
+interval_ms=1000
 ```
 
-A missing file or key means "on". `iliz_resmon_config.exe` writes the file and posts the registered window message `iliz_resmon_reload` to the running iliz resmon, which rereads the file and re-adds only the enabled icons (the message is allowed through UIPI, so it works when iliz resmon runs as administrator). The ini is not part of the release zip and is listed in `preserve` in `iliz_updater.json`, so updates keep your settings.
+A missing file or key means "on" for `cpu`/`mem`/`disk`/`net`, "off" for `gpu`, and 1000 ms for `interval_ms` (500, 1000 or 2000). `iliz_resmon_config.exe` writes the file and posts the registered window message `iliz_resmon_reload` to the running iliz resmon, which rereads the file, re-adds only the enabled icons and restarts its timer with the new interval (the message is allowed through UIPI, so it works when iliz resmon runs as administrator). The ini is not part of the release zip and is listed in `preserve` in `iliz_updater.json`, so updates keep your settings.
 
 ## Updates
 
@@ -63,10 +67,11 @@ You need Visual Studio 2022 Build Tools with the C++ workload. Run `build.bat`: 
 |---|---|
 | `main.cpp` | Entry point, window, menu, single instance, handoff to the elevated instance |
 | `app.cpp` | Once-a-second loop: sample, process, render |
-| `cpu.cpp`, `mem.cpp`, `disk.cpp`, `net.cpp` | Metric sampling |
+| `cpu.cpp`, `mem.cpp`, `disk.cpp`, `net.cpp`, `gpu.cpp` | Metric sampling (`gpu.cpp`: PDH, `pdh.dll` loaded only while the GPU icon is on) |
 | `procs.cpp` | Process snapshot (`NtQuerySystemInformation`): top lists by CPU, memory and I/O |
 | `etw.cpp` | Kernel tracing: per-process disk and network activity, automatic session recovery |
-| `history.cpp` | 5-minute history for the graphs |
+| `history.cpp` | One hour of per-second history (bytes / 16-bit codes) for the graphs |
+| `histwnd.cpp` | 60-minute history window (left click on an icon) |
 | `sticky.cpp` | Rows that dropped out of a top list and stay visible in grey |
 | `trayicon.cpp` | Icon drawing and tray handling |
 | `popup.cpp`, `views.cpp`, `draw.cpp`, `theme.h` | Popups: placement, content, drawing primitives, colors |
