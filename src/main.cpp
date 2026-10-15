@@ -62,7 +62,9 @@ static void ShowMenu(HWND h, int x, int y) {
     HidePopup();
     HMENU menu = CreatePopupMenu();
     BOOL elev = IsElevated();
+    if (EtwNote()) { AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, T(EtwNote())); }   // why per-process traffic is missing
     if (!elev) AppendMenuW(menu, MF_STRING, IDM_ADMIN, T(S_M_ADMIN));
+    if (EtwNote()) AppendMenuW(menu, MF_SEPARATOR, 0, 0);
     WCHAR cfgPath[MAX_PATH];
     BOOL hasCfg = ConfigPath(cfgPath);
     if (hasCfg) AppendMenuW(menu, MF_STRING, IDM_CONFIG, T(S_M_CONFIG));

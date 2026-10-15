@@ -6,6 +6,8 @@
 #include "etw.h"
 #include "disk.h"
 #include "procs.h"
+#include "lang.h"
+#include "autostart.h"
 
 static const GUID DiskIoGuid = {0x3d6fa8d4, 0xfe05, 0x11d0, {0x9d, 0xda, 0x00, 0xc0, 0x4f, 0xd7, 0xba, 0x7c}};
 static const GUID TcpGuid    = {0x9a280ac0, 0xc8e0, 0x11d1, {0x84, 0xe2, 0x00, 0xc0, 0x4f, 0xb9, 0x98, 0xa2}};
@@ -55,7 +57,10 @@ NTOP ntop[TOPN]; int nNtop;
 
 static inline UINT Hash(DWORD k) { return (k * 2654435761u) >> 8; }
 
-void EtwInit() { InitializeCriticalSection(&cs); }
+static int elevated;
+void EtwInit() { InitializeCriticalSection(&cs); elevated = IsElevated(); }
+
+int EtwNote() { return etwOn ? 0 : elevated ? S_NOTE_BLOCKED : S_NOTE_ADMIN; }
 
 static DWORD PidOfThread(DWORD tid) {
     DWORD now = (DWORD)(GetTickCount64() / 1000);

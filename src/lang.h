@@ -72,6 +72,10 @@ enum StrId {
     S_GPU_HDR,
     S_GPU_NONE,
     S_CFG_GPU,
+    S_NOTE_ADMIN,
+    S_NOTE_BLOCKED,
+    S_TIP_ADMIN,
+    S_TIP_BLOCKED,
     S_COUNT
 };
 

@@ -25,7 +25,7 @@ int ViewRows(int mode) {
     if (mode == ID_CPU) return 1 + GRAPH_ROWS + TOPN;
     if (mode == ID_GPU) return 1 + GRAPH_ROWS + GPU_ROWS;
     if (mode == ID_MEM) return 5 + GRAPH_ROWS + (mem.cache ? 1 : 0) + TOPN;
-    if (mode == ID_NET) return 2 * (nnic ? nnic : 1) + GRAPH_ROWS + (etwOn ? 2 + TOPN : 0);
+    if (mode == ID_NET) return 2 * (nnic ? nnic : 1) + GRAPH_ROWS + (etwOn ? 2 + TOPN : 1);
     int r = 0;
     for (int i = 0; i < ndisk; i++) r += 2 + lstrlenW(disks[i].letters) + (etwOn ? DTOPN : 0);
     return etwOn ? r : r + 1 + TOPN;
@@ -174,7 +174,10 @@ static void PaintNet(PCTX *c) {
         Text(c, c->L + SC(8), c->R, s, c->cDim, DT_LEFT); c->row++;
     }
     PaintNetGraph(c);
-    if (!etwOn) return;                                  // no trace -> no process section
+    if (!etwOn) {                                        // no trace (not elevated / blocked): adapter totals only
+        Text(c, c->L, c->R, T(EtwNote()), c->cDim, DT_LEFT); c->row++;
+        return;
+    }
     int x[5]; NetCols(c, x);
     Text(c, c->L, x[0], T(S_PROCS), c->cMain, DT_LEFT);
     Text(c, x[0], x[2] - SC(10), T(S_SPEED), c->cDim, DT_CENTER);

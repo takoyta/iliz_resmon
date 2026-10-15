@@ -9,6 +9,7 @@
 #include "net.h"
 #include "mem.h"
 #include "gpu.h"
+#include "etw.h"
 #include "format.h"
 #include "settings.h"
 
@@ -124,6 +125,7 @@ static BOOL Update(DWORD msg) {                          // FALSE if any icon is
     LONGLONG rx, tx; WCHAR a[24], b[24];
     NetTotals(&rx, &tx); FmtRate(a, rx); FmtRate(b, tx);
     wsprintfW(nidNet.szTip, T(S_TIP_NET), a, b);
+    if (EtwNote()) lstrcatW(nidNet.szTip, T(EtwNote() == S_NOTE_ADMIN ? S_TIP_ADMIN : S_TIP_BLOCKED));
     ok &= SetIcon(&nidNet, &icNet, DrawNet(), msg);
     }
     if (cfg.gpu) {

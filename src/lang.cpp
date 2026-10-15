@@ -67,6 +67,10 @@ static const WCHAR *const en[S_COUNT] = {
     L"GPU %d%%",
     L"GPU counters are not available",
     L"GPU (video card)",
+    L"Per-process traffic needs administrator rights",
+    L"Per-process traffic unavailable: tracing is blocked",
+    L"\nper-process: needs admin",
+    L"\nper-process: tracing blocked",
 };
 
 static const WCHAR *const ru[S_COUNT] = {
@@ -135,6 +139,10 @@ static const WCHAR *const ru[S_COUNT] = {
     L"Видеокарта %d%%",
     L"Счётчики GPU недоступны",
     L"Видеокарта (GPU)",
+    L"Трафик по процессам требует прав администратора",
+    L"Трафик по процессам недоступен: трассировка заблокирована",
+    L"\nпо процессам: нужен админ",
+    L"\nпо процессам: трассировка заблокирована",
 };
 
 const WCHAR *T(int id) {
