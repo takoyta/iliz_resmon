@@ -8,13 +8,14 @@
 #include "disk.h"
 #include "net.h"
 #include "mem.h"
+#include "gpu.h"
 #include "format.h"
 #include "settings.h"
 
-static Settings cfg = {1, 1, 1, 1, 1000};              // which icons are enabled (iliz_resmon.ini)
+static Settings cfg = {1, 1, 1, 1, 1000, 0};              // which icons are enabled (iliz_resmon.ini)
 
-static NOTIFYICONDATAW nidCpu, nidMem, nidDisk, nidNet;
-static HICON icCpu, icMem, icDisk, icNet;
+static NOTIFYICONDATAW nidCpu, nidMem, nidDisk, nidNet, nidGpu;
+static HICON icCpu, icMem, icDisk, icNet, icGpu;
 
 static int IconSize() { return GetSystemMetricsForDpi(SM_CXSMICON, GetDpiForSystem()); }
 
@@ -82,6 +83,19 @@ static HICON DrawMem() {                                 // one wide bar: used %
     return End(&c);
 }
 
+static HICON DrawGpu() {                                 // scrolling graph, one column per tick, newest right
+    static BYTE h[256]; static int pos;                  // ring of recent loads (icon is <= 256 px)
+    h[pos] = (BYTE)gpuLoad; pos = (pos + 1) & 255;
+    CANVAS c; Begin(&c, C_ICON_BG); int S = c.S;
+    HBRUSH b = CreateSolidBrush(C_GPU);
+    for (int x = 0; x < S; x++) {
+        int v = h[(pos - S + x + 512) & 255], hh = (v * S + 50) / 100; if (v > 0 && hh < 1) hh = 1;
+        RECT r = {x, S - hh, x + 1, S}; FillRect(c.dc, &r, b);
+    }
+    DeleteObject(b);
+    return End(&c);
+}
+
 static BOOL SetIcon(NOTIFYICONDATAW *nid, HICON *slot, HICON ic, DWORD msg) {
     nid->uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE; nid->hIcon = ic;
     BOOL ok = Shell_NotifyIconW(msg, nid);
@@ -112,13 +126,17 @@ static BOOL Update(DWORD msg) {                          // FALSE if any icon is
     wsprintfW(nidNet.szTip, T(S_TIP_NET), a, b);
     ok &= SetIcon(&nidNet, &icNet, DrawNet(), msg);
     }
+    if (cfg.gpu) {
+    wsprintfW(nidGpu.szTip, T(S_TIP_GPU), gpuLoad);
+    ok &= SetIcon(&nidGpu, &icGpu, DrawGpu(), msg);
+    }
     return ok;
 }
 
 void InitTray() {
-    NOTIFYICONDATAW *n[4] = {&nidCpu, &nidMem, &nidDisk, &nidNet};
-    UINT ids[4] = {ID_CPU, ID_MEM, ID_DISK, ID_NET};
-    for (int i = 0; i < 4; i++) {
+    NOTIFYICONDATAW *n[5] = {&nidCpu, &nidMem, &nidDisk, &nidNet, &nidGpu};
+    UINT ids[5] = {ID_CPU, ID_MEM, ID_DISK, ID_NET, ID_GPU};
+    for (int i = 0; i < 5; i++) {
         n[i]->cbSize = sizeof(NOTIFYICONDATAW); n[i]->hWnd = hMain; n[i]->uID = ids[i];
         n[i]->uCallbackMessage = WM_TRAY; n[i]->uVersion = NOTIFYICON_VERSION_4;
     }
@@ -132,6 +150,7 @@ void AddIcons() {
     if (cfg.cpu) Shell_NotifyIconW(NIM_SETVERSION, &nidCpu);
     if (cfg.mem) Shell_NotifyIconW(NIM_SETVERSION, &nidMem);
     if (cfg.disk && ndisk) Shell_NotifyIconW(NIM_SETVERSION, &nidDisk);
+    if (cfg.gpu) Shell_NotifyIconW(NIM_SETVERSION, &nidGpu);
 }
 
 void RemoveIcons() {                                     // deleting an icon that is not there is harmless
@@ -139,11 +158,13 @@ void RemoveIcons() {                                     // deleting an icon tha
     Shell_NotifyIconW(NIM_DELETE, &nidNet);
     Shell_NotifyIconW(NIM_DELETE, &nidMem);
     Shell_NotifyIconW(NIM_DELETE, &nidDisk);
+    Shell_NotifyIconW(NIM_DELETE, &nidGpu);
 }
 
 static void Load() {                                     // never end up with no icon at all: the menu lives on them
     LoadSettings(&cfg);
-    if (!cfg.cpu && !cfg.mem && !cfg.net && !(cfg.disk && ndisk)) cfg.cpu = 1;
+    if (!cfg.cpu && !cfg.mem && !cfg.net && !cfg.gpu && !(cfg.disk && ndisk)) cfg.cpu = 1;
+    GpuEnable(cfg.gpu);                                  // pdh.dll only while the GPU icon is shown
 }
 
 void LoadTraySettings() { Load(); }

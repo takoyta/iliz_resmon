@@ -63,6 +63,10 @@ static const WCHAR *const en[S_COUNT] = {
     L"peak %s",
     L"-%d min",
     L"now",
+    L"GPU: %d%%",
+    L"GPU %d%%",
+    L"GPU counters are not available",
+    L"GPU (video card)",
 };
 
 static const WCHAR *const ru[S_COUNT] = {
@@ -127,6 +131,10 @@ static const WCHAR *const ru[S_COUNT] = {
     L"пик %s",
     L"-%d мин",
     L"сейчас",
+    L"Видеокарта: %d%%",
+    L"Видеокарта %d%%",
+    L"Счётчики GPU недоступны",
+    L"Видеокарта (GPU)",
 };
 
 const WCHAR *T(int id) {

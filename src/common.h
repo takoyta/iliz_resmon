@@ -8,7 +8,7 @@
 #define TOPN 10                            // process list length
 #define MAXD 16                            // physical disks
 #define NAME_LEN 32                        // process name buffer (incl. 0)
-enum { ID_CPU = 1, ID_DISK, ID_NET, ID_MEM };   // tray icon ids = popup modes
+enum { ID_CPU = 1, ID_DISK, ID_NET, ID_MEM, ID_GPU };   // tray icon ids = popup modes
 
 typedef LONG (WINAPI *NtQSI_t)(int, PVOID, ULONG, PULONG);
 extern NtQSI_t NtQSI;

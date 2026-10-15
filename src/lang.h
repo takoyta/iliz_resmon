@@ -68,6 +68,10 @@ enum StrId {
     S_HIST_PEAK,
     S_MIN_AGO,
     S_NOW,
+    S_TIP_GPU,
+    S_GPU_HDR,
+    S_GPU_NONE,
+    S_CFG_GPU,
     S_COUNT
 };
 

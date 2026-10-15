@@ -1,5 +1,5 @@
 // User settings in iliz_resmon.ini next to the exe. Shared by iliz_resmon.exe and iliz_resmon_config.exe.
-// [tray] cpu/mem/disk/net = 1/0 (missing = on), interval_ms = 500/1000/2000 (default 1000).
+// [tray] cpu/mem/disk/net = 1/0 (missing = on), gpu = 1/0 (missing = off), interval_ms = 500/1000/2000 (default 1000).
 #pragma once
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -9,7 +9,7 @@
 #define SETTINGS_RELOAD_MSG L"iliz_resmon_reload"   // registered message: "reread the ini"
 #define SETTINGS_WND_CLASS  L"iliz_resmon"          // main window class (APP_ID)
 
-typedef struct { int cpu, mem, disk, net, interval; } Settings;   // interval: tick period, ms
+typedef struct { int cpu, mem, disk, net, interval, gpu; } Settings;   // interval: tick period, ms
 
 static inline int SettingsInterval(int v) { return v < 750 ? 500 : v < 1500 ? 1000 : 2000; }   // snap to 0.5 / 1 / 2 s
 
@@ -27,6 +27,7 @@ static inline void LoadSettings(Settings *s) {
     s->mem  = GetPrivateProfileIntW(L"tray", L"mem",  1, p) != 0;
     s->disk = GetPrivateProfileIntW(L"tray", L"disk", 1, p) != 0;
     s->net  = GetPrivateProfileIntW(L"tray", L"net",  1, p) != 0;
+    s->gpu  = GetPrivateProfileIntW(L"tray", L"gpu",  0, p) != 0;
     s->interval = SettingsInterval(GetPrivateProfileIntW(L"tray", L"interval_ms", 1000, p));
 }
 
@@ -37,6 +38,7 @@ static inline BOOL SaveSettings(const Settings *s) {
     ok &= WritePrivateProfileStringW(L"tray", L"mem",  s->mem  ? L"1" : L"0", p);
     ok &= WritePrivateProfileStringW(L"tray", L"disk", s->disk ? L"1" : L"0", p);
     ok &= WritePrivateProfileStringW(L"tray", L"net",  s->net  ? L"1" : L"0", p);
+    ok &= WritePrivateProfileStringW(L"tray", L"gpu",  s->gpu  ? L"1" : L"0", p);
     WCHAR iv[12]; wsprintfW(iv, L"%d", SettingsInterval(s->interval));
     ok &= WritePrivateProfileStringW(L"tray", L"interval_ms", iv, p);
     WritePrivateProfileStringW(0, 0, 0, p);         // flush the profile cache

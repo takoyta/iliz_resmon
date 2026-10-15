@@ -5,6 +5,7 @@
 #include "mem.h"
 #include "disk.h"
 #include "net.h"
+#include "gpu.h"
 #include "etw.h"
 #include "procs.h"
 #include "sticky.h"
@@ -17,7 +18,7 @@ void AppInit() { InitCpu(); InitDisks(); EtwInit(); EtwStart(); }
 
 void AppSample() {
     SampleCpu();                           // before SampleProcs: provides sysDelta for per-process CPU %
-    SampleMem(); SampleDisks(); SampleNet();
+    SampleMem(); SampleDisks(); SampleNet(); SampleGpu();
     EtwTick();                             // per-disk / per-process net from the trace
     SampleProcs();                         // after EtwTick: NameOf() for trace pids uses this snapshot
     EtwNames();                            // after SampleProcs: names for the net totals table

@@ -5,6 +5,7 @@
 #include "mem.h"
 #include "disk.h"
 #include "net.h"
+#include "gpu.h"
 #include "etw.h"
 #include "procs.h"
 #include "sticky.h"
@@ -18,10 +19,11 @@ static int g1[HISTN], g2[HISTN];           // graph scratch
 static int Last() { int n = HistLen(); return n < HISTN ? n : HISTN; }   // popup graphs: last HISTN seconds
 static int Pct(int m, int *o) { int n = Last(), b = HistLen() - n; for (int i = 0; i < n; i++) o[i] = HistPct(m, b + i) * 10; return n; }
 
-int ViewWidth(int mode) { return mode == ID_NET ? SC(520) : mode == ID_DISK ? SC(330) : mode == ID_MEM ? SC(300) : SC(240); }
+int ViewWidth(int mode) { return mode == ID_GPU ? SC(260) : mode == ID_NET ? SC(520) : mode == ID_DISK ? SC(330) : mode == ID_MEM ? SC(300) : SC(240); }
 
 int ViewRows(int mode) {
     if (mode == ID_CPU) return 1 + GRAPH_ROWS + TOPN;
+    if (mode == ID_GPU) return 1 + GRAPH_ROWS + GPU_ROWS;
     if (mode == ID_MEM) return 5 + GRAPH_ROWS + (mem.cache ? 1 : 0) + TOPN;
     if (mode == ID_NET) return 2 * (nnic ? nnic : 1) + GRAPH_ROWS + (etwOn ? 2 + TOPN : 0);
     int r = 0;
@@ -30,6 +32,7 @@ int ViewRows(int mode) {
 }
 
 void ViewColors(int mode, COLORREF *cMain, COLORREF *cBar) {
+    if (mode == ID_GPU) { *cMain = C_GPU; *cBar = C_GPU_DARK; return; }
     *cMain = mode == ID_CPU ? C_CPU : mode == ID_NET ? C_RX : mode == ID_MEM ? C_MEM : C_DSK;
     *cBar  = mode == ID_CPU ? C_CPU_DARK : mode == ID_NET ? C_RX_DARK : mode == ID_MEM ? C_MEM_DARK : C_DSK_DARK;
 }
@@ -181,8 +184,30 @@ static void PaintNet(PCTX *c) {
     for (int i = 0; i < nNtop; i++) NetRow(c, &ntop[i], full);
 }
 
+static void PaintGpu(PCTX *c) {                         // load, graph, busiest engine types
+    WCHAR s[64];
+    wsprintfW(s, T(S_GPU_HDR), gpuLoad);
+    Text(c, c->L, c->R, s, c->cMain, DT_LEFT); c->row++;
+    PaintGraph(c, g1, 0, Pct(H_GPU, g1), 0, 0, L"100%");
+    if (!gpuOk || !ngeng) { Text(c, c->L, c->R, gpuOk ? T(S_MEASURING) : T(S_GPU_NONE), c->cDim, DT_LEFT); return; }
+    int idx[MAXG], n = 0;
+    for (int i = 0; i < ngeng; i++) {                    // sort by load desc (stable: first seen wins ties)
+        int k = n++;
+        while (k > 0 && geng[idx[k - 1]].v < geng[i].v) { idx[k] = idx[k - 1]; k--; }
+        idx[k] = i;
+    }
+    for (int r = 0; r < n && r < GPU_ROWS; r++, c->row++) {
+        const GENG *e = &geng[idx[r]];
+        if (nGpuAd > 1) wsprintfW(s, L"GPU%d %s", e->ad, e->type); else lstrcpyW(s, e->type);
+        ListRow(c, c->L, c->R - COL_VAL, s, e->v, 100, 3, 1);
+        wsprintfW(s, L"%d%%", e->v);
+        Text(c, c->L, c->R - SC(4), s, c->cText, DT_RIGHT);
+    }
+}
+
 void ViewPaint(PCTX *c, int mode) {
-    if (mode == ID_CPU) PaintCpu(c);
+    if (mode == ID_GPU) PaintGpu(c);
+    else if (mode == ID_CPU) PaintCpu(c);
     else if (mode == ID_MEM) PaintMem(c);
     else if (mode == ID_NET) PaintNet(c);
     else PaintDisk(c);

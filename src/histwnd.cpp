@@ -15,6 +15,7 @@ static void Series(int id, SERIES *s) {
     s->b = -1; s->net = 0; s->c2 = 0;
     if (id == ID_NET) { s->a = H_RX; s->b = H_TX; s->net = 1; s->cMain = C_RX; s->cBar = C_RX_DARK; s->c2 = C_TX; s->name = T(S_CFG_NET); }
     else if (id == ID_MEM) { s->a = H_MEM; s->cMain = C_MEM; s->cBar = C_MEM_DARK; s->name = T(S_CFG_MEM); }
+    else if (id == ID_GPU) { s->a = H_GPU; s->cMain = C_GPU; s->cBar = C_GPU_DARK; s->name = L"GPU"; }
     else if (id == ID_DISK) { s->a = H_DISK; s->cMain = C_DSK; s->cBar = C_DSK_DARK; s->name = T(S_CFG_DISK); }
     else { s->a = H_CPU; s->b = H_CPUMAX; s->cMain = C_CPU; s->cBar = C_CPU_DARK; s->c2 = C_CPU_PEAK; s->name = L"CPU"; }
 }

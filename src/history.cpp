@@ -5,6 +5,7 @@
 #include "mem.h"
 #include "disk.h"
 #include "net.h"
+#include "gpu.h"
 
 #define NS (H_PCT_N + H_NET_N)
 static BYTE pct[H_PCT_N][HLONG];
@@ -39,7 +40,7 @@ void PushHistory() {
     for (int i = 0; i < ndisk; i++) if (disks[i].busy > dmx) dmx = disks[i].busy;
     LONGLONG rx, tx; NetTotals(&rx, &tx);
     acc[H_CPU] += AvgLoad(); if (mx > acc[H_CPUMAX]) acc[H_CPUMAX] = mx;
-    acc[H_MEM] += mem.load; acc[H_DISK] += dmx;
+    acc[H_MEM] += mem.load; acc[H_DISK] += dmx; acc[H_GPU] += gpuLoad;
     acc[H_PCT_N + H_RX] += rx; acc[H_PCT_N + H_TX] += tx;
     cnt++;
 }

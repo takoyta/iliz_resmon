@@ -12,6 +12,8 @@
 #define C_TX_TOT    RGB(180, 110, 40)
 #define C_MEM       RGB(190, 120, 255)
 #define C_MEM_DARK  RGB(90, 50, 140)
+#define C_GPU       RGB(255, 110, 140)
+#define C_GPU_DARK  RGB(140, 45, 70)
 
 #define C_ICON_BG     RGB(20, 30, 28)
 #define C_ICON_BG_NET RGB(18, 24, 32)

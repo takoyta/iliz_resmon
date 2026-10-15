@@ -8,3 +8,4 @@
 #define IDC_GROUP 106
 #define IDC_INTERVAL_LBL 107
 #define IDC_INTERVAL 108
+#define IDC_GPU   109
