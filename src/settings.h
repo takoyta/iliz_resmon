@@ -37,3 +37,22 @@ static inline BOOL SaveSettings(const Settings *s) {
     WritePrivateProfileStringW(0, 0, 0, p);         // flush the profile cache
     return ok;
 }
+
+// Autostart: HKCU\...\Run value "iliz_resmon" = quoted path of iliz_resmon.exe in this exe's folder (no admin needed).
+#define SETTINGS_RUN_KEY L"Software\\Microsoft\\Windows\\CurrentVersion\\Run"
+#define SETTINGS_RUN_VAL L"iliz_resmon"
+
+static inline BOOL AutostartEnabled() {
+    return RegGetValueW(HKEY_CURRENT_USER, SETTINGS_RUN_KEY, SETTINGS_RUN_VAL, RRF_RT_REG_SZ, 0, 0, 0) == ERROR_SUCCESS;
+}
+
+static inline BOOL AutostartSet(BOOL on) {
+    if (!on) {
+        LONG r = RegDeleteKeyValueW(HKEY_CURRENT_USER, SETTINGS_RUN_KEY, SETTINGS_RUN_VAL);
+        return r == ERROR_SUCCESS || r == ERROR_FILE_NOT_FOUND;
+    }
+    WCHAR v[MAX_PATH + 32];
+    v[0] = L'"'; SettingsDir(v + 1); lstrcatW(v, L"iliz_resmon.exe\"");
+    return RegSetKeyValueW(HKEY_CURRENT_USER, SETTINGS_RUN_KEY, SETTINGS_RUN_VAL, REG_SZ, v,
+                           (lstrlenW(v) + 1) * sizeof(WCHAR)) == ERROR_SUCCESS;
+}

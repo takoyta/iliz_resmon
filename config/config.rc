@@ -5,7 +5,7 @@
 
 1 24 "config.manifest"
 
-IDD_MAIN DIALOGEX 0, 0, 180, 112
+IDD_MAIN DIALOGEX 0, 0, 180, 101
 STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "iliz resmon: настройки"
 FONT 9, "Segoe UI", 400, 0, 1
@@ -15,8 +15,8 @@ BEGIN
     AUTOCHECKBOX    "Память", IDC_MEM, 16, 31, 150, 10
     AUTOCHECKBOX    "Диски", IDC_DISK, 16, 44, 150, 10
     AUTOCHECKBOX    "Сеть", IDC_NET, 16, 57, 150, 10
-    LTEXT           "Изменения применяются сразу.", IDC_HINT, 7, 77, 166, 10
-    DEFPUSHBUTTON   "Закрыть", IDOK, 123, 92, 50, 14
+    AUTOCHECKBOX    "Запускать с Windows", IDC_AUTO, 10, 79, 110, 10
+    DEFPUSHBUTTON   "Закрыть", IDOK, 123, 77, 50, 14
 END
 
 1 VERSIONINFO

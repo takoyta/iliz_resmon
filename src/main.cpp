@@ -12,7 +12,7 @@
 #include "iliz_updater_client.h"
 #include "settings.h"
 
-enum { IDM_AUTO = 1, IDM_ADMIN, IDM_CONFIG, IDM_UPDATE, IDM_ABOUT, IDM_EXIT };
+enum { IDM_ADMIN = 1, IDM_CONFIG, IDM_UPDATE, IDM_ABOUT, IDM_EXIT };
 enum { WM_APP_UPDATE = WM_APP + 7, TIMER_TICK = 1, TIMER_UPDATE = 2 };
 
 NtQSI_t NtQSI;
@@ -59,8 +59,7 @@ static void ShowAbout(HWND h) {
 static void ShowMenu(HWND h, int x, int y) {
     HidePopup();
     HMENU menu = CreatePopupMenu();
-    BOOL autoOn = AutostartEnabled(), elev = IsElevated();
-    AppendMenuW(menu, MF_STRING | (autoOn ? MF_CHECKED : 0), IDM_AUTO, L"Запускать с Windows");
+    BOOL elev = IsElevated();
     if (!elev) AppendMenuW(menu, MF_STRING, IDM_ADMIN, L"Перезапустить от администратора");
     WCHAR cfgPath[MAX_PATH];
     BOOL hasCfg = ConfigPath(cfgPath);
@@ -80,7 +79,6 @@ static void ShowMenu(HWND h, int x, int y) {
     DestroyMenu(menu);
     PostMessageW(h, WM_NULL, 0, 0);
     if (cmd == IDM_ABOUT) ShowAbout(h);
-    else if (cmd == IDM_AUTO) AutostartSet(!autoOn);
     else if (cmd == IDM_CONFIG) ShellExecuteW(h, 0, cfgPath, 0, 0, SW_SHOWNORMAL);
     else if (cmd == IDM_UPDATE) LaunchUpdater(h);
     else if (cmd == IDM_ADMIN) RelaunchElevated();          // the elevated instance asks us to quit

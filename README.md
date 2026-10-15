@@ -18,8 +18,8 @@ The UI is currently in Russian.
 - **Network**: download and upload speed, a 5-minute graph, and the top 10 processes by traffic with their current speed and today's totals (reset at midnight).
 - Processes that drop out of a top list stay visible in grey for 5 seconds, so you have time to see what it was.
 - DPI-aware (per-monitor v2), with correct popup placement, including icons in the hidden-icons flyout.
-- **Settings**: the tray menu item **Настройки…** (Settings) opens `iliz_resmon_config.exe`, a small dialog where you choose which of the four tray icons to show. Changes apply immediately; at least one icon stays on.
-- Autostart through `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, with no admin rights needed.
+- **Settings**: the tray menu item **Настройки…** (Settings) opens `iliz_resmon_config.exe`, a small dialog where you choose which of the four tray icons to show and whether to start with Windows. Changes apply immediately; at least one icon stays on.
+- Autostart (the **Запускать с Windows** checkbox in the configurator) through `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, with no admin rights needed.
 
 ## Administrator rights
 
@@ -70,8 +70,8 @@ You need Visual Studio 2022 Build Tools with the C++ workload. Run `build.bat`: 
 | `sticky.cpp` | Rows that dropped out of a top list and stay visible in grey |
 | `trayicon.cpp` | Icon drawing and tray handling |
 | `popup.cpp`, `views.cpp`, `draw.cpp`, `theme.h` | Popups: placement, content, drawing primitives, colors |
-| `autostart.cpp` | Elevation check, restart as administrator, autostart |
-| `settings.h` | `iliz_resmon.ini` read/write and the reload message, shared with the configurator |
+| `autostart.cpp` | Elevation check, restart as administrator |
+| `settings.h` | `iliz_resmon.ini` read/write, the reload message and autostart (HKCU Run), shared with the configurator |
 | `../config/` | `iliz_resmon_config.exe`: settings dialog (`config.cpp`, `config.rc`, manifest) |
 | `format.cpp` | Speed and size formatting |
 | `version.h`, `app.rc` | Version (one place) and the VERSIONINFO resource |

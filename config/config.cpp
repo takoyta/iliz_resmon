@@ -1,5 +1,5 @@
 // iliz_resmon_config.exe: tiny settings dialog for iliz resmon. Pure WinAPI, no CRT (entry in src\nocrt.cpp).
-// Every checkbox change is saved to iliz_resmon.ini at once and the running iliz_resmon is told to reread it.
+// Every checkbox change is saved (icons: ini, autostart: HKCU Run) to iliz_resmon.ini at once and the running iliz_resmon is told to reread it.
 #include "../src/common.h"
 #include "../src/settings.h"
 #include "config.h"
@@ -17,6 +17,15 @@ static void Load(HWND d) {
     int v[4] = {s.cpu, s.mem, s.disk, s.net};
     if (!v[0] && !v[1] && !v[2] && !v[3]) v[0] = 1;
     for (int i = 0; i < 4; i++) CheckDlgButton(d, ids[i], v[i] ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton(d, IDC_AUTO, AutostartEnabled() ? BST_CHECKED : BST_UNCHECKED);
+}
+
+static void OnAutostart(HWND d) {                        // HKCU Run: same user even when we run elevated
+    BOOL on = IsDlgButtonChecked(d, IDC_AUTO) == BST_CHECKED;
+    if (!AutostartSet(on)) {
+        CheckDlgButton(d, IDC_AUTO, on ? BST_UNCHECKED : BST_CHECKED);
+        MessageBoxW(d, L"Не удалось изменить автозапуск в реестре.", L"iliz resmon", MB_OK | MB_ICONWARNING);
+    }
 }
 
 static void OnToggle(HWND d, int id) {
@@ -41,6 +50,7 @@ static INT_PTR CALLBACK DlgProc(HWND d, UINT m, WPARAM w, LPARAM) {
     case WM_INITDIALOG: Load(d); return TRUE;
     case WM_COMMAND:
         if (LOWORD(w) == IDOK || LOWORD(w) == IDCANCEL) { EndDialog(d, 0); return TRUE; }
+        if (HIWORD(w) == BN_CLICKED && LOWORD(w) == IDC_AUTO) { OnAutostart(d); return TRUE; }
         if (HIWORD(w) == BN_CLICKED && LOWORD(w) >= IDC_CPU && LOWORD(w) <= IDC_NET) { OnToggle(d, LOWORD(w)); return TRUE; }
         break;
     }
