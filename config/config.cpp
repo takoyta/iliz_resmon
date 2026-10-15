@@ -2,6 +2,7 @@
 // Every checkbox change is saved (icons: ini, autostart: HKCU Run) to iliz_resmon.ini at once and the running iliz_resmon is told to reread it.
 #include "../src/common.h"
 #include "../src/settings.h"
+#include "../src/lang.h"
 #include "config.h"
 
 static UINT wmReload;
@@ -24,7 +25,7 @@ static void OnAutostart(HWND d) {                        // HKCU Run: same user 
     BOOL on = IsDlgButtonChecked(d, IDC_AUTO) == BST_CHECKED;
     if (!AutostartSet(on)) {
         CheckDlgButton(d, IDC_AUTO, on ? BST_UNCHECKED : BST_CHECKED);
-        MessageBoxW(d, L"Не удалось изменить автозапуск в реестре.", L"iliz resmon", MB_OK | MB_ICONWARNING);
+        MessageBoxW(d, T(S_CFG_AUTO_FAIL), L"iliz resmon", MB_OK | MB_ICONWARNING);
     }
 }
 
@@ -38,16 +39,26 @@ static void OnToggle(HWND d, int id) {
     }
     Settings s = {v[0], v[1], v[2], v[3]};
     if (!SaveSettings(&s)) {
-        MessageBoxW(d, L"Не удалось сохранить iliz_resmon.ini. Нет прав на запись в папку программы?",
+        MessageBoxW(d, T(S_CFG_SAVE_FAIL),
                     L"iliz resmon", MB_OK | MB_ICONWARNING);
         return;
     }
     Notify();
 }
 
+static void Texts(HWND d) {                              // the template is English; set the UI language here
+    SetWindowTextW(d, T(S_CFG_TITLE));
+    SetDlgItemTextW(d, IDC_GROUP, T(S_CFG_GROUP));
+    SetDlgItemTextW(d, IDC_MEM, T(S_CFG_MEM));
+    SetDlgItemTextW(d, IDC_DISK, T(S_CFG_DISK));
+    SetDlgItemTextW(d, IDC_NET, T(S_CFG_NET));
+    SetDlgItemTextW(d, IDC_AUTO, T(S_CFG_AUTO));
+    SetDlgItemTextW(d, IDOK, T(S_CFG_CLOSE));
+}
+
 static INT_PTR CALLBACK DlgProc(HWND d, UINT m, WPARAM w, LPARAM) {
     switch (m) {
-    case WM_INITDIALOG: Load(d); return TRUE;
+    case WM_INITDIALOG: Texts(d); Load(d); return TRUE;
     case WM_COMMAND:
         if (LOWORD(w) == IDOK || LOWORD(w) == IDCANCEL) { EndDialog(d, 0); return TRUE; }
         if (HIWORD(w) == BN_CLICKED && LOWORD(w) == IDC_AUTO) { OnAutostart(d); return TRUE; }
@@ -60,7 +71,7 @@ static INT_PTR CALLBACK DlgProc(HWND d, UINT m, WPARAM w, LPARAM) {
 int WINAPI wWinMain(HINSTANCE hi, HINSTANCE, PWSTR, int) {
     HANDLE mx = CreateMutexW(0, TRUE, L"iliz_resmon_config_once");
     if (mx && GetLastError() == ERROR_ALREADY_EXISTS) {  // already open: bring it to front
-        HWND w = FindWindowW(L"#32770", L"iliz resmon: настройки");
+        HWND w = FindWindowW(L"#32770", T(S_CFG_TITLE));
         if (w) SetForegroundWindow(w);
         return 0;
     }

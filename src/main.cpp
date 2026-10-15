@@ -1,6 +1,7 @@
 // iliz resmon: CPU / memory / disk / network load in the tray. Pure WinAPI, no third-party libraries.
 // main: windows, message loop, menu, single instance + elevated takeover.
 #include "common.h"
+#include "lang.h"
 #include "appinfo.h"
 #include <shellapi.h>
 #include "app.h"
@@ -38,7 +39,7 @@ static void OnUpdateInfo(IlizUpdateInfo *u) {
 
 static void LaunchUpdater(HWND h) {                      // interactive: shows versions and notes, asks, then closes us
     if (!IlizUpdaterLaunch(FALSE))
-        MessageBoxW(h, L"Не удалось запустить iliz_updater.exe. Он должен лежать рядом с программой.",
+        MessageBoxW(h, T(S_UPD_FAIL),
                     APP_NAME, MB_OK | MB_ICONWARNING | MB_TOPMOST);
 }
 
@@ -49,10 +50,10 @@ static BOOL ConfigPath(WCHAR *p) {                       // iliz_resmon_config.e
 
 static void ShowAbout(HWND h) {
     WCHAR t[256];
-    static const WCHAR *st[] = {L"не запущена", L"работает", L"недоступна", L"прервана, перезапуск"};
-    wsprintfW(t, APP_NAME L"\nВерсия " APP_VERSION L"\n\n" APP_DESC L"\n\nТрассировка дисков/сети: %s", st[etwState]);
-    if (etwErr) wsprintfW(t + lstrlenW(t), L" (ошибка %lu)", etwErr);
-    if (etwLost) wsprintfW(t + lstrlenW(t), L"\nПотеряно событий: %lu", etwLost);
+    const WCHAR *st[] = {T(S_ETW_OFF), T(S_ETW_ON), T(S_ETW_FAIL), T(S_ETW_RESTART)};
+    wsprintfW(t, T(S_ABOUT), APP_NAME, APP_VERSION, T(S_DESC), st[etwState]);
+    if (etwErr) wsprintfW(t + lstrlenW(t), T(S_ABOUT_ERR), etwErr);
+    if (etwLost) wsprintfW(t + lstrlenW(t), T(S_ABOUT_LOST), etwLost);
     MessageBoxW(h, t, APP_NAME, MB_OK | MB_ICONINFORMATION | MB_TOPMOST);
 }
 
@@ -60,20 +61,20 @@ static void ShowMenu(HWND h, int x, int y) {
     HidePopup();
     HMENU menu = CreatePopupMenu();
     BOOL elev = IsElevated();
-    if (!elev) AppendMenuW(menu, MF_STRING, IDM_ADMIN, L"Перезапустить от администратора");
+    if (!elev) AppendMenuW(menu, MF_STRING, IDM_ADMIN, T(S_M_ADMIN));
     WCHAR cfgPath[MAX_PATH];
     BOOL hasCfg = ConfigPath(cfgPath);
-    if (hasCfg) AppendMenuW(menu, MF_STRING, IDM_CONFIG, L"Настройки…");
+    if (hasCfg) AppendMenuW(menu, MF_STRING, IDM_CONFIG, T(S_M_CONFIG));
     WCHAR updPath[MAX_PATH], updText[96];
     if (IlizUpdaterPath(updPath, MAX_PATH)) {            // no updater next to the exe (dev build): no menu item
-        if (updLatest[0]) wsprintfW(updText, L"Обновить до v%s", updLatest);
-        else lstrcpyW(updText, L"Проверить обновления");
+        if (updLatest[0]) wsprintfW(updText, T(S_M_UPDATE_TO), updLatest);
+        else lstrcpyW(updText, T(S_M_CHECK));
         AppendMenuW(menu, MF_STRING, IDM_UPDATE, updText);
     }
     AppendMenuW(menu, MF_SEPARATOR, 0, 0);
     AppendMenuW(menu, MF_STRING, IDM_ABOUT, APP_NAME L" v" APP_VERSION);
     AppendMenuW(menu, MF_SEPARATOR, 0, 0);
-    AppendMenuW(menu, MF_STRING, IDM_EXIT, L"Выход");
+    AppendMenuW(menu, MF_STRING, IDM_EXIT, T(S_M_EXIT));
     SetForegroundWindow(h);
     UINT cmd = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY, x, y, 0, h, 0);
     DestroyMenu(menu);

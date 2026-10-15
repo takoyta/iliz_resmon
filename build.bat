@@ -20,7 +20,7 @@ cl /nologo /O1 /Os /GS- /GR- /EHs-c- /Zl /utf-8 /DUNICODE /Febin\iliz_resmon.exe
 del /q *.obj *.res 2>nul
 rem Configurator: own sources in config\, shares src\settings.h and the CRT-free entry from src\nocrt.cpp.
 rc /nologo /Isrc /foiliz_resmon_config.res config\config.rc || exit /b 1
-cl /nologo /O1 /Os /GS- /GR- /EHs-c- /Zl /utf-8 /DUNICODE /Febin\iliz_resmon_config.exe config\config.cpp src\nocrt.cpp iliz_resmon_config.res /link /NODEFAULTLIB /ENTRY:WinMainEntry /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF /MANIFEST:NO kernel32.lib user32.lib advapi32.lib || (del /q *.obj *.res 2>nul & exit /b 1)
+cl /nologo /O1 /Os /GS- /GR- /EHs-c- /Zl /utf-8 /DUNICODE /Febin\iliz_resmon_config.exe config\config.cpp src\nocrt.cpp src\lang.cpp iliz_resmon_config.res /link /NODEFAULTLIB /ENTRY:WinMainEntry /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF /MANIFEST:NO kernel32.lib user32.lib advapi32.lib || (del /q *.obj *.res 2>nul & exit /b 1)
 del /q *.obj *.res 2>nul
 rem Runtime companions: updater config, and the updater exe if the sibling project has it.
 copy /y iliz_updater.json bin\ >nul

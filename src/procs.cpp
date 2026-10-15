@@ -1,6 +1,7 @@
 // Process sampling via NtQuerySystemInformation(SystemProcessInformation), every tick:
 // top lists by CPU time, I/O bytes and private working set. Buffers sized to the actual process count.
 #include "common.h"
+#include "lang.h"
 #include "procs.h"
 #include "cpu.h"
 
@@ -105,7 +106,7 @@ void SampleProcs() {
 }
 
 const WCHAR *NameOf(DWORD pid) {
-    if (pid == 0) return L"System (ядро)";
+    if (pid == 0) return T(S_KERNEL);
     if (pid == 4) return L"System";
     const PREC *r = FindPrev(pid);
     return r ? r->name : L"?";

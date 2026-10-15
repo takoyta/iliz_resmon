@@ -2,6 +2,7 @@
 // Built with /NODEFAULTLIB /ENTRY:WinMainEntry /GS- and no /GL, so these are not turned into recursive calls.
 #ifdef _MSC_VER
 #include "common.h"
+#include "lang.h"
 #include <intrin.h>
 
 extern "C" {
@@ -19,7 +20,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int);
 
 static LONG WINAPI OnCrash(EXCEPTION_POINTERS *e) {    // show what crashed instead of exiting silently
     WCHAR m[160];
-    wsprintfW(m, L"%s упал: исключение 0x%08X по смещению 0x%X.", APP_NAME,
+    wsprintfW(m, T(S_CRASH), APP_NAME,
               e->ExceptionRecord->ExceptionCode,
               (UINT)((BYTE*)e->ExceptionRecord->ExceptionAddress - (BYTE*)GetModuleHandleW(0)));
     MessageBoxW(0, m, APP_NAME, MB_ICONERROR | MB_TOPMOST);

@@ -1,5 +1,6 @@
 // Popup drawing primitives.
 #include "draw.h"
+#include "lang.h"
 #include "history.h"
 #include "format.h"
 
@@ -76,7 +77,7 @@ void PaintGraph(PCTX *c, const int *fill, const int *l2, int n, COLORREF c2, int
     RECT t = {x0 + SC(3), y0, c->R - SC(3), y1};
     SetTextColor(c->dc, c->cDim);
     DrawTextW(c->dc, topLabel, -1, &t, DT_SINGLELINE | DT_TOP | DT_RIGHT);
-    DrawTextW(c->dc, L"5 мин", -1, &t, DT_SINGLELINE | DT_BOTTOM | DT_LEFT);
+    DrawTextW(c->dc, T(S_5MIN), -1, &t, DT_SINGLELINE | DT_BOTTOM | DT_LEFT);
     c->row += GRAPH_ROWS;
 }
 

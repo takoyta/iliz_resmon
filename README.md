@@ -8,7 +8,7 @@ A tiny resource monitor for the Windows system tray: CPU, memory, disks and netw
 <img src="docs/cpu.png" height="300"> <img src="docs/mem.png" height="300"> <img src="docs/disk.png" height="300"> <img src="docs/net.png" height="300">
 </p>
 
-The UI is currently in Russian.
+The UI is in English or Russian, picked from the Windows display language (Russian for a Russian UI, English otherwise).
 
 ## Features
 
@@ -18,8 +18,8 @@ The UI is currently in Russian.
 - **Network**: download and upload speed, a 5-minute graph, and the top 10 processes by traffic with their current speed and today's totals (reset at midnight).
 - Processes that drop out of a top list stay visible in grey for 5 seconds, so you have time to see what it was.
 - DPI-aware (per-monitor v2), with correct popup placement, including icons in the hidden-icons flyout.
-- **Settings**: the tray menu item **Настройки…** (Settings) opens `iliz_resmon_config.exe`, a small dialog where you choose which of the four tray icons to show and whether to start with Windows. Changes apply immediately; at least one icon stays on.
-- Autostart (the **Запускать с Windows** checkbox in the configurator) through `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, with no admin rights needed.
+- **Settings**: the tray menu item **Settings…** opens `iliz_resmon_config.exe`, a small dialog where you choose which of the four tray icons to show and whether to start with Windows. Changes apply immediately; at least one icon stays on.
+- Autostart (the **Start with Windows** checkbox in the configurator) through `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, with no admin rights needed.
 
 ## Administrator rights
 
@@ -47,11 +47,11 @@ The release zip contains `iliz_updater.exe` and `iliz_updater.json` from
 [iliz_updater](https://github.com/takoyta/iliz_updater). Keep them next to `iliz_resmon.exe`.
 
 - On start and then every 6 hours the program runs a quiet check against the GitHub releases of this repository. The updater itself limits real requests to once per 24 hours (`check_interval_hours`).
-- The tray menu has **Проверить обновления** (Check for updates). When a newer release is found, the item becomes **Обновить до vX.Y.Z** (Update to vX.Y.Z).
+- The tray menu has **Check for updates**. When a newer release is found, the item becomes **Update to vX.Y.Z**.
 - The item opens the updater window with the current and new version and the release notes. After you confirm, it downloads the zip, checks SHA-256, closes iliz resmon, replaces the files (rolling back on any error) and starts it again with the same rights.
 - Without `iliz_updater.exe` next to the exe (for example, a local build) the menu item is hidden.
 
-To publish a release, run `release.bat`. It builds the exe and writes `dist\iliz_resmon-<version>.zip` (both exes, updater, its config, license) and `dist\SHA256SUMS`. Upload both to a GitHub release tagged `v<version>`, for example `gh release create v0.17.0 dist\iliz_resmon-0.17.0.zip dist\SHA256SUMS`. The updater exe is taken from `..\iliz_updater\bin` (override with `ILIZ_UPDATER_EXE`). The version lives in `src\version.h` and goes into both the code and the exe's VERSIONINFO, which the updater compares with the release tag.
+To publish a release, run `release.bat`. It builds the exe and writes `dist\iliz_resmon-<version>.zip` (both exes, updater, its config, license) and `dist\SHA256SUMS`. Upload both to a GitHub release tagged `v<version>`, for example `gh release create v0.18.0 dist\iliz_resmon-0.18.0.zip dist\SHA256SUMS`. The updater exe is taken from `..\iliz_updater\bin` (override with `ILIZ_UPDATER_EXE`). The version lives in `src\version.h` and goes into both the code and the exe's VERSIONINFO, which the updater compares with the release tag.
 
 ## Building
 
@@ -73,6 +73,7 @@ You need Visual Studio 2022 Build Tools with the C++ workload. Run `build.bat`: 
 | `autostart.cpp` | Elevation check, restart as administrator |
 | `settings.h` | `iliz_resmon.ini` read/write, the reload message and autostart (HKCU Run), shared with the configurator |
 | `../config/` | `iliz_resmon_config.exe`: settings dialog (`config.cpp`, `config.rc`, manifest) |
+| `lang.h`, `lang.cpp` | English and Russian UI strings, shared with the configurator |
 | `format.cpp` | Speed and size formatting |
 | `version.h`, `app.rc` | Version (one place) and the VERSIONINFO resource |
 | `iliz_updater_client.h` | Copy of the CRT-free iliz_updater client: background check, launching the update |

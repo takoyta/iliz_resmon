@@ -5,3 +5,4 @@
 #define IDC_DISK  103
 #define IDC_NET   104
 #define IDC_AUTO  105
+#define IDC_GROUP 106

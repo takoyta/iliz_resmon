@@ -1,5 +1,6 @@
 // Tray icons: bar drawing and Shell_NotifyIcon (NOTIFYICON_VERSION_4).
 #include "common.h"
+#include "lang.h"
 #include <shellapi.h>
 #include "theme.h"
 #include "trayicon.h"
@@ -96,19 +97,19 @@ static BOOL Update(DWORD msg) {                          // FALSE if any icon is
     ok &= SetIcon(&nidCpu, &icCpu, DrawBars(load, ncpu, C_CPU, C_CPU_DARK), msg);
     }
     if (cfg.mem) {
-    wsprintfW(nidMem.szTip, L"Память: %d%%", mem.load);
+    wsprintfW(nidMem.szTip, T(S_TIP_MEM), mem.load);
     ok &= SetIcon(&nidMem, &icMem, DrawMem(), msg);
     }
     if (cfg.disk && ndisk) {
         int v[MAXD], mx = 0;
         for (int i = 0; i < ndisk; i++) { v[i] = disks[i].busy; if (v[i] > mx) mx = v[i]; }
-        wsprintfW(nidDisk.szTip, L"Диски: %d%%", mx);
+        wsprintfW(nidDisk.szTip, T(S_TIP_DISK), mx);
         ok &= SetIcon(&nidDisk, &icDisk, DrawBars(v, ndisk, C_DSK, C_DSK_DARK), msg);
     }
     if (cfg.net) {
     LONGLONG rx, tx; WCHAR a[24], b[24];
     NetTotals(&rx, &tx); FmtRate(a, rx); FmtRate(b, tx);
-    wsprintfW(nidNet.szTip, L"Сеть: ↓%s ↑%s", a, b);
+    wsprintfW(nidNet.szTip, T(S_TIP_NET), a, b);
     ok &= SetIcon(&nidNet, &icNet, DrawNet(), msg);
     }
     return ok;

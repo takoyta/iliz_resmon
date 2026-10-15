@@ -17,6 +17,6 @@
   "close_timeout_sec": 15,
   "check_interval_hours": 24,
   "work_dir": "update",
-  "language": "ru",
+  "language": "auto",
   "log": true
 }
