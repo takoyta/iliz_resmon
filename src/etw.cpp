@@ -12,7 +12,6 @@ static const GUID TcpGuid    = {0x9a280ac0, 0xc8e0, 0x11d1, {0x84, 0xe2, 0x00, 0
 static const GUID UdpGuid    = {0xbf3a50c5, 0xa9c9, 0x4988, {0xa0, 0x05, 0x2d, 0xf0, 0xb7, 0xc8, 0x0f, 0x80}};
 static const GUID SessGuid   = {0x6c1a7f3e, 0x41b2, 0x4d8e, {0x9a, 0x51, 0x2e, 0x7c, 0x10, 0x5b, 0x33, 0xa4}};
 #define SESS_NAME APP_ID
-#define OLD_SESS_NAME L"CpuTray"                          // name used up to 0.13.0
 // Kernel MOF event layouts (x64). DiskIo_TypeGroup1: Read=10, Write=11; DiskNumber@0, TransferSize@8,
 // IssuingThreadId@48. TcpIp/UdpIp_TypeGroup1: Send=10, Recv=11, SendIPV6=26, RecvIPV6=27; PID@0, size@4.
 #define OP_SEND    10
@@ -167,7 +166,7 @@ static BOOL Alive() {                                    // trace thread running
 }
 
 // Stop leftover sessions from killed instances: our session GUID must be unique, so an orphan
-// under an old name (CpuTrayDiskIo, CpuTray) makes StartTrace fail with a name collision.
+// left by a killed instance makes StartTrace fail with a name collision.
 static void StopOrphans() {
     enum { N = 64, PSZ = sizeof(EVENT_TRACE_PROPERTIES) + 2 * 256 * sizeof(WCHAR) };
     static BYTE buf[N][PSZ]; EVENT_TRACE_PROPERTIES *pp[N];
@@ -183,7 +182,7 @@ static void StopOrphans() {
     if (n > N) n = N;                                    // n is the total count, may exceed the array
     for (ULONG i = 0; i < n; i++) {
         const WCHAR *name = (const WCHAR*)((BYTE*)pp[i] + pp[i]->LoggerNameOffset);
-        if (InlineIsEqualGUID(pp[i]->Wnode.Guid, SessGuid) || !lstrcmpiW(name, L"CpuTrayDiskIo") || !lstrcmpiW(name, OLD_SESS_NAME))
+        if (InlineIsEqualGUID(pp[i]->Wnode.Guid, SessGuid))
             ControlTraceW(0, name, Props(), EVENT_TRACE_CONTROL_STOP);
     }
 }

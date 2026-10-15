@@ -5,7 +5,6 @@
 
 #define RUN_KEY L"Software\\Microsoft\\Windows\\CurrentVersion\\Run"
 #define RUN_VAL APP_ID
-#define OLD_RUN_VAL L"CpuTray"                             // name used up to 0.13.0
 
 BOOL IsElevated() {
     HANDLE tk; TOKEN_ELEVATION e = {0}; DWORD n;
@@ -20,7 +19,6 @@ BOOL AutostartEnabled() {
 }
 
 void AutostartSet(BOOL on) {
-    RegDeleteKeyValueW(HKEY_CURRENT_USER, RUN_KEY, OLD_RUN_VAL);           // drop pre-rename entry
     if (!on) { RegDeleteKeyValueW(HKEY_CURRENT_USER, RUN_KEY, RUN_VAL); return; }
     WCHAR v[MAX_PATH + 2];
     DWORD n = GetModuleFileNameW(0, v + 1, MAX_PATH);
