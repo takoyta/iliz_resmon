@@ -6,3 +6,4 @@
 *.zip
 dist/
 update/
+bin/

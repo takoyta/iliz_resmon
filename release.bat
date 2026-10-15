@@ -27,9 +27,9 @@ if not exist "%OUT%" mkdir "%OUT%"
 if exist "%STAGE%" rmdir /s /q "%STAGE%"
 if exist "%ZIP%" del /q "%ZIP%"
 mkdir "%STAGE%"
-copy /y "%ROOT%iliz_resmon.exe" "%STAGE%\" >nul || exit /b 1
+copy /y "%ROOT%bin\iliz_resmon.exe" "%STAGE%\" >nul || exit /b 1
 copy /y "%ILIZ_UPDATER_EXE%" "%STAGE%\iliz_updater.exe" >nul || exit /b 1
-copy /y "%ROOT%iliz_updater.json" "%STAGE%\" >nul || exit /b 1
+copy /y "%ROOT%bin\iliz_updater.json" "%STAGE%\" >nul || exit /b 1
 copy /y "%ROOT%LICENSE" "%STAGE%\" >nul || exit /b 1
 
 powershell -NoProfile -Command "Compress-Archive -Path '%STAGE%\*' -DestinationPath '%ZIP%' -Force" || exit /b 1

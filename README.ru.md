@@ -38,7 +38,7 @@
 
 ## Сборка
 
-Нужны Visual Studio 2022 Build Tools с компонентом C++. Запустите `build.bat`: он собирает все `src\*.cpp` в `iliz_resmon.exe` в корне проекта. Если Build Tools установлены в другое место, задайте путь в переменной `VSINSTALL`.
+Нужны Visual Studio 2022 Build Tools с компонентом C++. Запустите `build.bat`: он собирает все `src\*.cpp` в `bin\iliz_resmon.exe` и кладёт рядом `iliz_updater.json` (и `iliz_updater.exe` из `..\iliz_updater\bin`, если он есть), так что `bin\` готова к запуску. Если Build Tools установлены в другое место, задайте путь в переменной `VSINSTALL`.
 
 ## Устройство кода (`src/`)
 

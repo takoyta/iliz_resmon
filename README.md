@@ -40,7 +40,7 @@ To publish a release, run `release.bat`. It builds the exe and writes `dist\iliz
 
 ## Building
 
-You need Visual Studio 2022 Build Tools with the C++ workload. Run `build.bat`: it compiles all `src\*.cpp` into `iliz_resmon.exe` in the project root. If Build Tools are installed elsewhere, set the `VSINSTALL` environment variable to their path.
+You need Visual Studio 2022 Build Tools with the C++ workload. Run `build.bat`: it compiles all `src\*.cpp` into `bin\iliz_resmon.exe` and puts `iliz_updater.json` (and `iliz_updater.exe` from `..\iliz_updater\bin`, if present) next to it, so `bin\` is a ready-to-run folder. If Build Tools are installed elsewhere, set the `VSINSTALL` environment variable to their path.
 
 ## Code layout (`src/`)
 
