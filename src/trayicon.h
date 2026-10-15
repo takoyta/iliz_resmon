@@ -1,6 +1,8 @@
 #pragma once
 #include "common.h"
 void InitTray();
-void AddIcons();                           // also after Explorer restart
+void LoadTraySettings();                   // read iliz_resmon.ini (before the first AddIcons)
+void ReloadTraySettings();                 // reread ini, remove and re-add icons
+void AddIcons();                           // also after Explorer restart; only enabled icons
 void UpdateIcons();
 void RemoveIcons();

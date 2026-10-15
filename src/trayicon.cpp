@@ -8,6 +8,9 @@
 #include "net.h"
 #include "mem.h"
 #include "format.h"
+#include "settings.h"
+
+static Settings cfg = {1, 1, 1, 1};              // which icons are enabled (iliz_resmon.ini)
 
 static NOTIFYICONDATAW nidCpu, nidMem, nidDisk, nidNet;
 static HICON icCpu, icMem, icDisk, icNet;
@@ -88,20 +91,26 @@ static BOOL SetIcon(NOTIFYICONDATAW *nid, HICON *slot, HICON ic, DWORD msg) {
 
 static BOOL Update(DWORD msg) {                          // FALSE if any icon is missing in the tray
     BOOL ok = TRUE;
+    if (cfg.cpu) {
     wsprintfW(nidCpu.szTip, L"CPU: %d%%", AvgLoad());
     ok &= SetIcon(&nidCpu, &icCpu, DrawBars(load, ncpu, C_CPU, C_CPU_DARK), msg);
+    }
+    if (cfg.mem) {
     wsprintfW(nidMem.szTip, L"Память: %d%%", mem.load);
     ok &= SetIcon(&nidMem, &icMem, DrawMem(), msg);
-    if (ndisk) {
+    }
+    if (cfg.disk && ndisk) {
         int v[MAXD], mx = 0;
         for (int i = 0; i < ndisk; i++) { v[i] = disks[i].busy; if (v[i] > mx) mx = v[i]; }
         wsprintfW(nidDisk.szTip, L"Диски: %d%%", mx);
         ok &= SetIcon(&nidDisk, &icDisk, DrawBars(v, ndisk, C_DSK, C_DSK_DARK), msg);
     }
+    if (cfg.net) {
     LONGLONG rx, tx; WCHAR a[24], b[24];
     NetTotals(&rx, &tx); FmtRate(a, rx); FmtRate(b, tx);
     wsprintfW(nidNet.szTip, L"Сеть: ↓%s ↑%s", a, b);
     ok &= SetIcon(&nidNet, &icNet, DrawNet(), msg);
+    }
     return ok;
 }
 
@@ -118,15 +127,28 @@ void UpdateIcons() { if (!Update(NIM_MODIFY)) AddIcons(); }   // tray not ready 
 
 void AddIcons() {
     Update(NIM_ADD);
-    Shell_NotifyIconW(NIM_SETVERSION, &nidNet);
-    Shell_NotifyIconW(NIM_SETVERSION, &nidCpu);
-    Shell_NotifyIconW(NIM_SETVERSION, &nidMem);
-    if (ndisk) Shell_NotifyIconW(NIM_SETVERSION, &nidDisk);
+    if (cfg.net) Shell_NotifyIconW(NIM_SETVERSION, &nidNet);
+    if (cfg.cpu) Shell_NotifyIconW(NIM_SETVERSION, &nidCpu);
+    if (cfg.mem) Shell_NotifyIconW(NIM_SETVERSION, &nidMem);
+    if (cfg.disk && ndisk) Shell_NotifyIconW(NIM_SETVERSION, &nidDisk);
 }
 
-void RemoveIcons() {
+void RemoveIcons() {                                     // deleting an icon that is not there is harmless
     Shell_NotifyIconW(NIM_DELETE, &nidCpu);
     Shell_NotifyIconW(NIM_DELETE, &nidNet);
     Shell_NotifyIconW(NIM_DELETE, &nidMem);
-    if (ndisk) Shell_NotifyIconW(NIM_DELETE, &nidDisk);
+    Shell_NotifyIconW(NIM_DELETE, &nidDisk);
+}
+
+static void Load() {                                     // never end up with no icon at all: the menu lives on them
+    LoadSettings(&cfg);
+    if (!cfg.cpu && !cfg.mem && !cfg.net && !(cfg.disk && ndisk)) cfg.cpu = 1;
+}
+
+void LoadTraySettings() { Load(); }
+
+void ReloadTraySettings() {                              // configurator changed the ini: re-add only enabled icons
+    RemoveIcons();
+    Load();
+    AddIcons();
 }

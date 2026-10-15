@@ -10,7 +10,7 @@
     "prerelease": false
   },
   "require_hash": true,
-  "preserve": [],
+  "preserve": ["iliz_resmon.ini"],
   "restart": true,
   "restart_args": "",
   "close_host": "graceful",

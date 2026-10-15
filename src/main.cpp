@@ -10,15 +10,16 @@
 #include "popup.h"
 #include "autostart.h"
 #include "iliz_updater_client.h"
+#include "settings.h"
 
-enum { IDM_AUTO = 1, IDM_ADMIN, IDM_UPDATE, IDM_ABOUT, IDM_EXIT };
+enum { IDM_AUTO = 1, IDM_ADMIN, IDM_CONFIG, IDM_UPDATE, IDM_ABOUT, IDM_EXIT };
 enum { WM_APP_UPDATE = WM_APP + 7, TIMER_TICK = 1, TIMER_UPDATE = 2 };
 
 NtQSI_t NtQSI;
 HWND hMain, hPop;
 int popMode;
 ULONGLONG tickPrev, tickNow;
-static UINT wmTaskbar, wmQuit;
+static UINT wmTaskbar, wmQuit, wmReload;
 static WCHAR updLatest[64];                              // newer version found by the background check, or empty
 static BOOL updBusy;                                     // a background check is running
 
@@ -41,6 +42,11 @@ static void LaunchUpdater(HWND h) {                      // interactive: shows v
                     APP_NAME, MB_OK | MB_ICONWARNING | MB_TOPMOST);
 }
 
+static BOOL ConfigPath(WCHAR *p) {                       // iliz_resmon_config.exe next to our exe
+    SettingsDir(p); lstrcatW(p, L"iliz_resmon_config.exe");
+    return GetFileAttributesW(p) != INVALID_FILE_ATTRIBUTES;
+}
+
 static void ShowAbout(HWND h) {
     WCHAR t[256];
     static const WCHAR *st[] = {L"не запущена", L"работает", L"недоступна", L"прервана, перезапуск"};
@@ -56,6 +62,9 @@ static void ShowMenu(HWND h, int x, int y) {
     BOOL autoOn = AutostartEnabled(), elev = IsElevated();
     AppendMenuW(menu, MF_STRING | (autoOn ? MF_CHECKED : 0), IDM_AUTO, L"Запускать с Windows");
     if (!elev) AppendMenuW(menu, MF_STRING, IDM_ADMIN, L"Перезапустить от администратора");
+    WCHAR cfgPath[MAX_PATH];
+    BOOL hasCfg = ConfigPath(cfgPath);
+    if (hasCfg) AppendMenuW(menu, MF_STRING, IDM_CONFIG, L"Настройки…");
     WCHAR updPath[MAX_PATH], updText[96];
     if (IlizUpdaterPath(updPath, MAX_PATH)) {            // no updater next to the exe (dev build): no menu item
         if (updLatest[0]) wsprintfW(updText, L"Обновить до v%s", updLatest);
@@ -72,6 +81,7 @@ static void ShowMenu(HWND h, int x, int y) {
     PostMessageW(h, WM_NULL, 0, 0);
     if (cmd == IDM_ABOUT) ShowAbout(h);
     else if (cmd == IDM_AUTO) AutostartSet(!autoOn);
+    else if (cmd == IDM_CONFIG) ShellExecuteW(h, 0, cfgPath, 0, 0, SW_SHOWNORMAL);
     else if (cmd == IDM_UPDATE) LaunchUpdater(h);
     else if (cmd == IDM_ADMIN) RelaunchElevated();          // the elevated instance asks us to quit
     else if (cmd == IDM_EXIT) DestroyWindow(h);
@@ -93,6 +103,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         PostQuitMessage(0); return 0;
     }
     if (m == wmTaskbar) { AddIcons(); return 0; }        // Explorer restarted
+    if (m == wmReload) { HidePopup(); ReloadTraySettings(); return 0; }   // from iliz_resmon_config.exe
     if (m == wmQuit) { DestroyWindow(h); return 0; }      // elevated instance takes over
     return DefWindowProcW(h, m, w, l);
 }
@@ -122,10 +133,13 @@ int WINAPI wWinMain(HINSTANCE hi, HINSTANCE, PWSTR, int) {
     // Hidden top-level window (not HWND_MESSAGE): message-only windows miss the TaskbarCreated broadcast.
     hMain = CreateWindowExW(WS_EX_TOOLWINDOW, APP_ID, L"", WS_POPUP, 0, 0, 0, 0, 0, 0, hi, 0);
     ChangeWindowMessageFilterEx(hMain, wmQuit, MSGFLT_ALLOW, 0);
+    wmReload = RegisterWindowMessageW(SETTINGS_RELOAD_MSG);  // the configurator runs non-elevated: let it through UIPI
+    ChangeWindowMessageFilterEx(hMain, wmReload, MSGFLT_ALLOW, 0);
     hPop = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE, APP_ID L"_pop", L"",
                            WS_POPUP, 0, 0, 10, 10, 0, 0, hi, 0);
 
     InitTray();
+    LoadTraySettings();
     tickNow = GetTickCount64();
     AppSample();                                         // baseline: lists are ready after the first tick
     AddIcons();

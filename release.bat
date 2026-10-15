@@ -1,6 +1,6 @@
 @echo off
 rem Builds iliz_resmon.exe and packs dist\iliz_resmon-<ver>.zip + dist\SHA256SUMS for a GitHub release.
-rem The zip holds iliz_resmon.exe, iliz_updater.exe, iliz_updater.json, LICENSE.
+rem The zip holds iliz_resmon.exe, iliz_resmon_config.exe, iliz_updater.exe, iliz_updater.json, LICENSE. Never iliz_resmon.ini (user settings, also in "preserve").
 rem iliz_updater.exe is taken from ..\iliz_updater\bin (override with ILIZ_UPDATER_EXE).
 setlocal EnableDelayedExpansion
 set ROOT=%~dp0
@@ -28,6 +28,7 @@ if exist "%STAGE%" rmdir /s /q "%STAGE%"
 if exist "%ZIP%" del /q "%ZIP%"
 mkdir "%STAGE%"
 copy /y "%ROOT%bin\iliz_resmon.exe" "%STAGE%\" >nul || exit /b 1
+copy /y "%ROOT%bin\iliz_resmon_config.exe" "%STAGE%\" >nul || exit /b 1
 copy /y "%ILIZ_UPDATER_EXE%" "%STAGE%\iliz_updater.exe" >nul || exit /b 1
 copy /y "%ROOT%bin\iliz_updater.json" "%STAGE%\" >nul || exit /b 1
 copy /y "%ROOT%LICENSE" "%STAGE%\" >nul || exit /b 1

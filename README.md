@@ -18,6 +18,7 @@ The UI is currently in Russian.
 - **Network**: download and upload speed, a 5-minute graph, and the top 10 processes by traffic with their current speed and today's totals (reset at midnight).
 - Processes that drop out of a top list stay visible in grey for 5 seconds, so you have time to see what it was.
 - DPI-aware (per-monitor v2), with correct popup placement, including icons in the hidden-icons flyout.
+- **Settings**: the tray menu item **Настройки…** (Settings) opens `iliz_resmon_config.exe`, a small dialog where you choose which of the four tray icons to show. Changes apply immediately; at least one icon stays on.
 - Autostart through `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, with no admin rights needed.
 
 ## Administrator rights
@@ -25,6 +26,20 @@ The UI is currently in Russian.
 Per-process disk and network statistics come from kernel tracing (ETW), which needs administrator rights. Without them everything else still works. The "Restart as administrator" menu item starts an elevated copy, which closes the non-elevated instance by itself.
 
 Some anti-cheat systems (for example, Easy Anti-Cheat) block kernel tracing while a game is running. The program retries every 15 seconds and recovers on its own after you exit the game.
+
+## Settings
+
+Settings live in `iliz_resmon.ini` next to the exe:
+
+```ini
+[tray]
+cpu=1
+mem=1
+disk=1
+net=1
+```
+
+A missing file or key means "on". `iliz_resmon_config.exe` writes the file and posts the registered window message `iliz_resmon_reload` to the running iliz resmon, which rereads the file and re-adds only the enabled icons (the message is allowed through UIPI, so it works when iliz resmon runs as administrator). The ini is not part of the release zip and is listed in `preserve` in `iliz_updater.json`, so updates keep your settings.
 
 ## Updates
 
@@ -36,11 +51,11 @@ The release zip contains `iliz_updater.exe` and `iliz_updater.json` from
 - The item opens the updater window with the current and new version and the release notes. After you confirm, it downloads the zip, checks SHA-256, closes iliz resmon, replaces the files (rolling back on any error) and starts it again with the same rights.
 - Without `iliz_updater.exe` next to the exe (for example, a local build) the menu item is hidden.
 
-To publish a release, run `release.bat`. It builds the exe and writes `dist\iliz_resmon-<version>.zip` (exe, updater, its config, license) and `dist\SHA256SUMS`. Upload both to a GitHub release tagged `v<version>`, for example `gh release create v0.16.0 dist\iliz_resmon-0.16.0.zip dist\SHA256SUMS`. The updater exe is taken from `..\iliz_updater\bin` (override with `ILIZ_UPDATER_EXE`). The version lives in `src\version.h` and goes into both the code and the exe's VERSIONINFO, which the updater compares with the release tag.
+To publish a release, run `release.bat`. It builds the exe and writes `dist\iliz_resmon-<version>.zip` (both exes, updater, its config, license) and `dist\SHA256SUMS`. Upload both to a GitHub release tagged `v<version>`, for example `gh release create v0.17.0 dist\iliz_resmon-0.17.0.zip dist\SHA256SUMS`. The updater exe is taken from `..\iliz_updater\bin` (override with `ILIZ_UPDATER_EXE`). The version lives in `src\version.h` and goes into both the code and the exe's VERSIONINFO, which the updater compares with the release tag.
 
 ## Building
 
-You need Visual Studio 2022 Build Tools with the C++ workload. Run `build.bat`: it compiles all `src\*.cpp` into `bin\iliz_resmon.exe` and puts `iliz_updater.json` (and `iliz_updater.exe` from `..\iliz_updater\bin`, if present) next to it, so `bin\` is a ready-to-run folder. If Build Tools are installed elsewhere, set the `VSINSTALL` environment variable to their path.
+You need Visual Studio 2022 Build Tools with the C++ workload. Run `build.bat`: it compiles all `src\*.cpp` into `bin\iliz_resmon.exe` and `config\config.cpp` (plus `src\nocrt.cpp`) into `bin\iliz_resmon_config.exe` and puts `iliz_updater.json` (and `iliz_updater.exe` from `..\iliz_updater\bin`, if present) next to it, so `bin\` is a ready-to-run folder. If Build Tools are installed elsewhere, set the `VSINSTALL` environment variable to their path.
 
 ## Code layout (`src/`)
 
@@ -56,6 +71,8 @@ You need Visual Studio 2022 Build Tools with the C++ workload. Run `build.bat`: 
 | `trayicon.cpp` | Icon drawing and tray handling |
 | `popup.cpp`, `views.cpp`, `draw.cpp`, `theme.h` | Popups: placement, content, drawing primitives, colors |
 | `autostart.cpp` | Elevation check, restart as administrator, autostart |
+| `settings.h` | `iliz_resmon.ini` read/write and the reload message, shared with the configurator |
+| `../config/` | `iliz_resmon_config.exe`: settings dialog (`config.cpp`, `config.rc`, manifest) |
 | `format.cpp` | Speed and size formatting |
 | `version.h`, `app.rc` | Version (one place) and the VERSIONINFO resource |
 | `iliz_updater_client.h` | Copy of the CRT-free iliz_updater client: background check, launching the update |

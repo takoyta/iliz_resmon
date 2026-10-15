@@ -1,0 +1,46 @@
+#pragma code_page(65001)
+#include <windows.h>
+#include "config.h"
+#include "../src/version.h"
+
+1 24 "config.manifest"
+
+IDD_MAIN DIALOGEX 0, 0, 180, 112
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "iliz resmon: настройки"
+FONT 9, "Segoe UI", 400, 0, 1
+BEGIN
+    GROUPBOX        "Иконки в трее", -1, 7, 5, 166, 66
+    AUTOCHECKBOX    "CPU", IDC_CPU, 16, 18, 150, 10
+    AUTOCHECKBOX    "Память", IDC_MEM, 16, 31, 150, 10
+    AUTOCHECKBOX    "Диски", IDC_DISK, 16, 44, 150, 10
+    AUTOCHECKBOX    "Сеть", IDC_NET, 16, 57, 150, 10
+    LTEXT           "Изменения применяются сразу.", IDC_HINT, 7, 77, 166, 10
+    DEFPUSHBUTTON   "Закрыть", IDOK, 123, 92, 50, 14
+END
+
+1 VERSIONINFO
+FILEVERSION     APP_VERSION_NUM
+PRODUCTVERSION  APP_VERSION_NUM
+FILEOS          VOS_NT_WINDOWS32
+FILETYPE        VFT_APP
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName",      "takoyta\0"
+            VALUE "FileDescription",  "iliz resmon settings\0"
+            VALUE "FileVersion",      APP_VERSION_A "\0"
+            VALUE "InternalName",     "iliz_resmon_config\0"
+            VALUE "LegalCopyright",   "MIT License\0"
+            VALUE "OriginalFilename", "iliz_resmon_config.exe\0"
+            VALUE "ProductName",      "iliz resmon\0"
+            VALUE "ProductVersion",   APP_VERSION_A "\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
