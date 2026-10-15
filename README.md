@@ -51,7 +51,7 @@ The release zip contains `iliz_updater.exe` and `iliz_updater.json` from
 - The item opens the updater window with the current and new version and the release notes. After you confirm, it downloads the zip, checks SHA-256, closes iliz resmon, replaces the files (rolling back on any error) and starts it again with the same rights.
 - Without `iliz_updater.exe` next to the exe (for example, a local build) the menu item is hidden.
 
-To publish a release, run `release.bat`. It builds the exe and writes `dist\iliz_resmon-<version>.zip` (both exes, updater, its config, license) and `dist\SHA256SUMS`. Upload both to a GitHub release tagged `v<version>`, for example `gh release create v0.18.0 dist\iliz_resmon-0.18.0.zip dist\SHA256SUMS`. The updater exe is taken from `..\iliz_updater\bin` (override with `ILIZ_UPDATER_EXE`). The version lives in `src\version.h` and goes into both the code and the exe's VERSIONINFO, which the updater compares with the release tag.
+Publishing releases is described in [RELEASING.md](RELEASING.md).
 
 ## Building
 
