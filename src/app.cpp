@@ -11,6 +11,7 @@
 #include "history.h"
 #include "trayicon.h"
 #include "popup.h"
+#include "histwnd.h"
 
 void AppInit() { InitCpu(); InitDisks(); EtwInit(); EtwStart(); }
 
@@ -26,7 +27,8 @@ void AppTick() {
     tickPrev = tickNow; tickNow = GetTickCount64();
     AppSample();
     StickyTick();                          // derive: needs procs + ETW tops of this tick
-    PushHistory();                         // derive: needs CPU, mem, net
+    PushHistory();                         // derive: needs CPU, mem, disks, net
     UpdateIcons();                         // render
     if (popMode) PopupTick();
+    HistWndTick();
 }

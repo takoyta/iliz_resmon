@@ -64,6 +64,10 @@ enum StrId {
     S_CFG_I500,
     S_CFG_I1000,
     S_CFG_I2000,
+    S_HIST_TITLE,
+    S_HIST_PEAK,
+    S_MIN_AGO,
+    S_NOW,
     S_COUNT
 };
 

@@ -9,6 +9,7 @@
 #include "procs.h"
 #include "trayicon.h"
 #include "popup.h"
+#include "histwnd.h"
 #include "autostart.h"
 #include "iliz_updater_client.h"
 #include "settings.h"
@@ -94,6 +95,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         switch (LOWORD(l)) {
         case NIN_POPUPOPEN:  ShowPopup(HIWORD(l)); break;
         case NIN_POPUPCLOSE: HidePopup(); break;
+        case NIN_SELECT: case NIN_KEYSELECT: HidePopup(); HistWndShow(HIWORD(l)); break;   // left click: 60-min history
         case WM_CONTEXTMENU: ShowMenu(h, (short)LOWORD(w), (short)HIWORD(w)); break;
         }
         return 0;

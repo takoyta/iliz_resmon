@@ -1,32 +1,49 @@
-// 5-minute history: CPU avg / max-core, RAM used %, network rx/tx bytes/s.
+// Metric history: per-second ring buffers for an hour (~25 KB), see history.h.
 #include "common.h"
 #include "history.h"
 #include "cpu.h"
 #include "mem.h"
+#include "disk.h"
 #include "net.h"
 
-HIST hCpuAvg, hCpuMax, hMem;
-HISTL hNetRx, hNetTx;
+#define NS (H_PCT_N + H_NET_N)
+static BYTE pct[H_PCT_N][HLONG];
+static USHORT net[H_NET_N][HLONG];
+static int hn, hpos;                       // stored count, next write slot
+static LONGLONG acc[NS]; static int cnt;   // ticks of the current second
+static ULONGLONG sec;                      // tickNow / 1000 of acc
 
-static void Push(HIST *h, int v) {
-    h->v[h->pos] = (BYTE)(v < 0 ? 0 : v > 100 ? 100 : v);
-    h->pos = (h->pos + 1) % HISTN;
-    if (h->n < HISTN) h->n++;
+static USHORT Enc(ULONG v) { int s = 0; while (v >= 2048) { v >>= 1; s++; } return (USHORT)(s << 11 | v); }
+static ULONG Dec(USHORT c) { return (ULONG)(c & 2047) << (c >> 11); }
+
+static void Store(const LONGLONG *v) {
+    for (int m = 0; m < H_PCT_N; m++) pct[m][hpos] = (BYTE)(v[m] < 0 ? 0 : v[m] > 100 ? 100 : v[m]);
+    for (int m = 0; m < H_NET_N; m++) { LONGLONG x = v[H_PCT_N + m]; net[m][hpos] = Enc((ULONG)(x < 0 ? 0 : x > 0xFFFFFFFF ? 0xFFFFFFFF : x)); }
+    hpos = (hpos + 1) % HLONG;
+    if (hn < HLONG) hn++;
 }
-
-static void PushL(HISTL *h, LONGLONG v) {
-    h->v[h->pos] = (ULONG)(v < 0 ? 0 : v > 0xFFFFFFFF ? 0xFFFFFFFF : v);
-    h->pos = (h->pos + 1) % HISTN;
-    if (h->n < HISTN) h->n++;
-}
-
-ULONG HistGetL(const HISTL *h, int i) { return h->v[(h->pos - h->n + i + HISTN) % HISTN]; }
-
-int HistGet(const HIST *h, int i) { return h->v[(h->pos - h->n + i + HISTN) % HISTN]; }
 
 void PushHistory() {
-    int mx = 0;
+    ULONGLONG s = tickNow / 1000;
+    if (cnt && s != sec) {                               // second over: store it (repeat for skipped seconds)
+        LONGLONG v[NS], zero[NS] = {0};
+        for (int i = 0; i < NS; i++) v[i] = i == H_CPUMAX ? acc[i] : acc[i] / cnt;
+        ULONGLONG gap = s - sec; if (gap > HLONG) gap = HLONG;
+        Store(v);
+        for (ULONGLONG k = 1; k < gap; k++) Store(gap <= 5 ? v : zero);   // long gap = sleep: leave it empty
+        ZeroMemory(acc, sizeof(acc)); cnt = 0;
+    }
+    sec = s;
+    int mx = 0, dmx = 0;
     for (int i = 0; i < ncpu; i++) if (load[i] > mx) mx = load[i];
-    Push(&hCpuAvg, AvgLoad()); Push(&hCpuMax, mx); Push(&hMem, mem.load);
-    LONGLONG rx, tx; NetTotals(&rx, &tx); PushL(&hNetRx, rx); PushL(&hNetTx, tx);
+    for (int i = 0; i < ndisk; i++) if (disks[i].busy > dmx) dmx = disks[i].busy;
+    LONGLONG rx, tx; NetTotals(&rx, &tx);
+    acc[H_CPU] += AvgLoad(); if (mx > acc[H_CPUMAX]) acc[H_CPUMAX] = mx;
+    acc[H_MEM] += mem.load; acc[H_DISK] += dmx;
+    acc[H_PCT_N + H_RX] += rx; acc[H_PCT_N + H_TX] += tx;
+    cnt++;
 }
+
+int HistLen() { return hn; }
+int HistPct(int m, int i) { return pct[m][(hpos - hn + i + HLONG) % HLONG]; }
+ULONG HistNet(int m, int i) { return Dec(net[m][(hpos - hn + i + HLONG) % HLONG]); }

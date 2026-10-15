@@ -15,7 +15,8 @@
 enum { F_PCT10, F_BYTES, F_RATE };         // value formats
 
 static int g1[HISTN], g2[HISTN];           // graph scratch
-static int Pct(const HIST *h, int *o) { for (int i = 0; i < h->n; i++) o[i] = HistGet(h, i) * 10; return h->n; }
+static int Last() { int n = HistLen(); return n < HISTN ? n : HISTN; }   // popup graphs: last HISTN seconds
+static int Pct(int m, int *o) { int n = Last(), b = HistLen() - n; for (int i = 0; i < n; i++) o[i] = HistPct(m, b + i) * 10; return n; }
 
 int ViewWidth(int mode) { return mode == ID_NET ? SC(520) : mode == ID_DISK ? SC(330) : mode == ID_MEM ? SC(300) : SC(240); }
 
@@ -57,8 +58,8 @@ static void PaintCpu(PCTX *c) {
     WCHAR s[64];
     wsprintfW(s, T(S_CPU_HDR), AvgLoad(), ncpu);
     Text(c, c->L, c->R, s, c->cMain, DT_LEFT); c->row++;
-    Pct(&hCpuMax, g2);
-    PaintGraph(c, g1, g2, Pct(&hCpuAvg, g1), C_CPU_PEAK, 0, L"100%");
+    Pct(H_CPUMAX, g2);
+    PaintGraph(c, g1, g2, Pct(H_CPU, g1), C_CPU_PEAK, 0, L"100%");
     PaintTop(c, &stTop[TM_CPU], F_PCT10);
 }
 
@@ -67,7 +68,7 @@ static void PaintMem(PCTX *c) {
     FmtBytes(a, mem.total - mem.avail); FmtBytes(b, mem.total);
     wsprintfW(s, T(S_MEM_HDR), mem.load, a, b);
     Text(c, c->L, c->R, s, c->cMain, DT_LEFT); c->row++;
-    PaintGraph(c, g1, 0, Pct(&hMem, g1), 0, 0, L"100%");
+    PaintGraph(c, g1, 0, Pct(H_MEM, g1), 0, 0, L"100%");
     int y = RowY(c);                                     // usage bar
     RECT o = {c->L, y + SC(5), c->R, y + ROWH - SC(5)};
     FrameRect(c->dc, &o, c->bar);
@@ -135,9 +136,9 @@ static void PaintDisk(PCTX *c) {
 }
 
 static void PaintNetGraph(PCTX *c) {                    // rx area + tx line, auto-scaled to window max
-    int n = hNetRx.n; ULONG mx = 1024;
-    for (int i = 0; i < n; i++) { ULONG a = HistGetL(&hNetRx, i), b = HistGetL(&hNetTx, i); if (a > mx) mx = a; if (b > mx) mx = b; }
-    for (int i = 0; i < n; i++) { g1[i] = (int)((ULONGLONG)HistGetL(&hNetRx, i) * 1000 / mx); g2[i] = (int)((ULONGLONG)HistGetL(&hNetTx, i) * 1000 / mx); }
+    int n = Last(), b = HistLen() - n; ULONG mx = 1024;
+    for (int i = 0; i < n; i++) { ULONG x = HistNet(H_RX, b + i), y = HistNet(H_TX, b + i); if (x > mx) mx = x; if (y > mx) mx = y; }
+    for (int i = 0; i < n; i++) { g1[i] = (int)((ULONGLONG)HistNet(H_RX, b + i) * 1000 / mx); g2[i] = (int)((ULONGLONG)HistNet(H_TX, b + i) * 1000 / mx); }
     WCHAR s[24]; FmtRate(s, mx);
     PaintGraph(c, g1, g2, n, C_TX, 1, s);
 }

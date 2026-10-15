@@ -59,6 +59,10 @@ static const WCHAR *const en[S_COUNT] = {
     L"0.5 s",
     L"1 s",
     L"2 s",
+    L"%s: last 60 minutes",
+    L"peak %s",
+    L"-%d min",
+    L"now",
 };
 
 static const WCHAR *const ru[S_COUNT] = {
@@ -119,6 +123,10 @@ static const WCHAR *const ru[S_COUNT] = {
     L"0,5 с",
     L"1 с",
     L"2 с",
+    L"%s: последние 60 минут",
+    L"пик %s",
+    L"-%d мин",
+    L"сейчас",
 };
 
 const WCHAR *T(int id) {
