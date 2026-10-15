@@ -60,6 +60,10 @@ enum StrId {
     S_CFG_CLOSE,
     S_CFG_AUTO_FAIL,
     S_CFG_SAVE_FAIL,
+    S_CFG_INTERVAL,
+    S_CFG_I500,
+    S_CFG_I1000,
+    S_CFG_I2000,
     S_COUNT
 };
 

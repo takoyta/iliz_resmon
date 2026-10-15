@@ -102,7 +102,11 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         PostQuitMessage(0); return 0;
     }
     if (m == wmTaskbar) { AddIcons(); return 0; }        // Explorer restarted
-    if (m == wmReload) { HidePopup(); ReloadTraySettings(); return 0; }   // from iliz_resmon_config.exe
+    if (m == wmReload) {                                 // from iliz_resmon_config.exe
+        HidePopup(); ReloadTraySettings();
+        SetTimer(h, TIMER_TICK, TrayInterval(), 0);      // same id: replaces (restarts) the tick timer
+        return 0;
+    }   // from iliz_resmon_config.exe
     if (m == wmQuit) { DestroyWindow(h); return 0; }      // elevated instance takes over
     return DefWindowProcW(h, m, w, l);
 }
@@ -142,7 +146,7 @@ int WINAPI wWinMain(HINSTANCE hi, HINSTANCE, PWSTR, int) {
     tickNow = GetTickCount64();
     AppSample();                                         // baseline: lists are ready after the first tick
     AddIcons();
-    SetTimer(hMain, TIMER_TICK, 1000, 0);
+    SetTimer(hMain, TIMER_TICK, TrayInterval(), 0);
     IlizUpdaterWatchQuit(hMain, WM_CLOSE);               // the updater asks us to exit before installing
     CheckUpdates();
     SetTimer(hMain, TIMER_UPDATE, 6 * 3600 * 1000, 0);

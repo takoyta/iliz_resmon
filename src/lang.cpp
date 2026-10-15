@@ -55,6 +55,10 @@ static const WCHAR *const en[S_COUNT] = {
     L"Close",
     L"Could not change autostart in the registry.",
     L"Could not save iliz_resmon.ini. No write access to the program folder?",
+    L"Update interval:",
+    L"0.5 s",
+    L"1 s",
+    L"2 s",
 };
 
 static const WCHAR *const ru[S_COUNT] = {
@@ -111,6 +115,10 @@ static const WCHAR *const ru[S_COUNT] = {
     L"Закрыть",
     L"Не удалось изменить автозапуск в реестре.",
     L"Не удалось сохранить iliz_resmon.ini. Нет прав на запись в папку программы?",
+    L"Интервал обновления:",
+    L"0,5 с",
+    L"1 с",
+    L"2 с",
 };
 
 const WCHAR *T(int id) {

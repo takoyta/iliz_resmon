@@ -11,7 +11,7 @@
 #include "format.h"
 #include "settings.h"
 
-static Settings cfg = {1, 1, 1, 1};              // which icons are enabled (iliz_resmon.ini)
+static Settings cfg = {1, 1, 1, 1, 1000};              // which icons are enabled (iliz_resmon.ini)
 
 static NOTIFYICONDATAW nidCpu, nidMem, nidDisk, nidNet;
 static HICON icCpu, icMem, icDisk, icNet;
@@ -147,6 +147,8 @@ static void Load() {                                     // never end up with no
 }
 
 void LoadTraySettings() { Load(); }
+
+int TrayInterval() { return cfg.interval; }
 
 void ReloadTraySettings() {                              // configurator changed the ini: re-add only enabled icons
     RemoveIcons();

@@ -1,5 +1,5 @@
 // iliz_resmon_config.exe: tiny settings dialog for iliz resmon. Pure WinAPI, no CRT (entry in src\nocrt.cpp).
-// Every checkbox change is saved (icons: ini, autostart: HKCU Run) to iliz_resmon.ini at once and the running iliz_resmon is told to reread it.
+// Every change is saved at once (icons, update interval: iliz_resmon.ini; autostart: HKCU Run) and the running iliz_resmon is told to reread it.
 #include "../src/common.h"
 #include "../src/settings.h"
 #include "../src/lang.h"
@@ -7,6 +7,7 @@
 
 static UINT wmReload;
 static const int ids[4] = {IDC_CPU, IDC_MEM, IDC_DISK, IDC_NET};
+static const int intervals[3] = {500, 1000, 2000};      // combo items, in order
 
 static void Notify() {                                   // every top-level window of our class (normally one)
     HWND w = 0;
@@ -18,6 +19,7 @@ static void Load(HWND d) {
     int v[4] = {s.cpu, s.mem, s.disk, s.net};
     if (!v[0] && !v[1] && !v[2] && !v[3]) v[0] = 1;
     for (int i = 0; i < 4; i++) CheckDlgButton(d, ids[i], v[i] ? BST_CHECKED : BST_UNCHECKED);
+    for (int i = 0; i < 3; i++) if (intervals[i] == s.interval) SendDlgItemMessageW(d, IDC_INTERVAL, CB_SETCURSEL, i, 0);
     CheckDlgButton(d, IDC_AUTO, AutostartEnabled() ? BST_CHECKED : BST_UNCHECKED);
 }
 
@@ -29,21 +31,31 @@ static void OnAutostart(HWND d) {                        // HKCU Run: same user 
     }
 }
 
-static void OnToggle(HWND d, int id) {
-    int v[4], on = 0;
-    for (int i = 0; i < 4; i++) on += v[i] = IsDlgButtonChecked(d, ids[i]) == BST_CHECKED;
-    if (!on) {                                           // keep at least one icon: the menu lives on it
-        CheckDlgButton(d, id, BST_CHECKED);
-        MessageBeep(MB_ICONWARNING);
-        return;
-    }
-    Settings s = {v[0], v[1], v[2], v[3]};
+static void Save(HWND d, const int *v) {                 // v: icon checkboxes in ids[] order
+    int sel = (int)SendDlgItemMessageW(d, IDC_INTERVAL, CB_GETCURSEL, 0, 0);
+    Settings s = {v[0], v[1], v[2], v[3], intervals[sel >= 0 && sel < 3 ? sel : 1]};
     if (!SaveSettings(&s)) {
         MessageBoxW(d, T(S_CFG_SAVE_FAIL),
                     L"iliz resmon", MB_OK | MB_ICONWARNING);
         return;
     }
     Notify();
+}
+
+static int Icons(HWND d, int *v) {                       // read the icon checkboxes; returns how many are on
+    int on = 0;
+    for (int i = 0; i < 4; i++) on += v[i] = IsDlgButtonChecked(d, ids[i]) == BST_CHECKED;
+    return on;
+}
+
+static void OnToggle(HWND d, int id) {
+    int v[4];
+    if (!Icons(d, v)) {                                           // keep at least one icon: the menu lives on it
+        CheckDlgButton(d, id, BST_CHECKED);
+        MessageBeep(MB_ICONWARNING);
+        return;
+    }
+    Save(d, v);
 }
 
 static void Texts(HWND d) {                              // the template is English; set the UI language here
@@ -53,6 +65,8 @@ static void Texts(HWND d) {                              // the template is Engl
     SetDlgItemTextW(d, IDC_DISK, T(S_CFG_DISK));
     SetDlgItemTextW(d, IDC_NET, T(S_CFG_NET));
     SetDlgItemTextW(d, IDC_AUTO, T(S_CFG_AUTO));
+    SetDlgItemTextW(d, IDC_INTERVAL_LBL, T(S_CFG_INTERVAL));
+    for (int i = 0; i < 3; i++) SendDlgItemMessageW(d, IDC_INTERVAL, CB_ADDSTRING, 0, (LPARAM)T(S_CFG_I500 + i));
     SetDlgItemTextW(d, IDOK, T(S_CFG_CLOSE));
 }
 
@@ -61,6 +75,7 @@ static INT_PTR CALLBACK DlgProc(HWND d, UINT m, WPARAM w, LPARAM) {
     case WM_INITDIALOG: Texts(d); Load(d); return TRUE;
     case WM_COMMAND:
         if (LOWORD(w) == IDOK || LOWORD(w) == IDCANCEL) { EndDialog(d, 0); return TRUE; }
+        if (HIWORD(w) == CBN_SELCHANGE && LOWORD(w) == IDC_INTERVAL) { int v[4]; Icons(d, v); Save(d, v); return TRUE; }
         if (HIWORD(w) == BN_CLICKED && LOWORD(w) == IDC_AUTO) { OnAutostart(d); return TRUE; }
         if (HIWORD(w) == BN_CLICKED && LOWORD(w) >= IDC_CPU && LOWORD(w) <= IDC_NET) { OnToggle(d, LOWORD(w)); return TRUE; }
         break;
