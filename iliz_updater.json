@@ -1,0 +1,22 @@
+{
+  "app_name": "iliz resmon",
+  "host_exe": "iliz_resmon.exe",
+  "version": { "source": "exe" },
+  "source": {
+    "type": "github",
+    "repo": "takoyta/iliz_resmon",
+    "asset": "iliz_resmon-*.zip",
+    "sums_asset": "SHA256SUMS",
+    "prerelease": false
+  },
+  "require_hash": true,
+  "preserve": [],
+  "restart": true,
+  "restart_args": "",
+  "close_host": "graceful",
+  "close_timeout_sec": 15,
+  "check_interval_hours": 24,
+  "work_dir": "update",
+  "language": "ru",
+  "log": true
+}

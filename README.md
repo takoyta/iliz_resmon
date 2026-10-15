@@ -26,6 +26,18 @@ Per-process disk and network statistics come from kernel tracing (ETW), which ne
 
 Some anti-cheat systems (for example, Easy Anti-Cheat) block kernel tracing while a game is running. The program retries every 15 seconds and recovers on its own after you exit the game.
 
+## Updates
+
+The release zip contains `iliz_updater.exe` and `iliz_updater.json` from
+[iliz_updater](https://github.com/takoyta/iliz_updater). Keep them next to `iliz_resmon.exe`.
+
+- On start and then every 6 hours the program runs a quiet check against the GitHub releases of this repository. The updater itself limits real requests to once per 24 hours (`check_interval_hours`).
+- The tray menu has **Проверить обновления** (Check for updates). When a newer release is found, the item becomes **Обновить до vX.Y.Z** (Update to vX.Y.Z).
+- The item opens the updater window with the current and new version and the release notes. After you confirm, it downloads the zip, checks SHA-256, closes iliz resmon, replaces the files (rolling back on any error) and starts it again with the same rights.
+- Without `iliz_updater.exe` next to the exe (for example, a local build) the menu item is hidden.
+
+To publish a release, run `release.bat`. It builds the exe and writes `dist\iliz_resmon-<version>.zip` (exe, updater, its config, license) and `dist\SHA256SUMS`. Upload both to a GitHub release tagged `v<version>`, for example `gh release create v0.16.0 dist\iliz_resmon-0.16.0.zip dist\SHA256SUMS`. The updater exe is taken from `..\iliz_updater\bin` (override with `ILIZ_UPDATER_EXE`). The version lives in `src\version.h` and goes into both the code and the exe's VERSIONINFO, which the updater compares with the release tag.
+
 ## Building
 
 You need Visual Studio 2022 Build Tools with the C++ workload. Run `build.bat`: it compiles all `src\*.cpp` into `iliz_resmon.exe` in the project root. If Build Tools are installed elsewhere, set the `VSINSTALL` environment variable to their path.
@@ -45,6 +57,8 @@ You need Visual Studio 2022 Build Tools with the C++ workload. Run `build.bat`: 
 | `popup.cpp`, `views.cpp`, `draw.cpp`, `theme.h` | Popups: placement, content, drawing primitives, colors |
 | `autostart.cpp` | Elevation check, restart as administrator, autostart |
 | `format.cpp` | Speed and size formatting |
+| `version.h`, `app.rc` | Version (one place) and the VERSIONINFO resource |
+| `iliz_updater_client.h` | Copy of the CRT-free iliz_updater client: background check, launching the update |
 | `nocrt.cpp` | CRT-free build: entry point, `memset`/`memcpy`/`memcmp`, crash dialog |
 
 ## License

@@ -9,14 +9,37 @@
 #include "trayicon.h"
 #include "popup.h"
 #include "autostart.h"
+#include "iliz_updater_client.h"
 
-enum { IDM_AUTO = 1, IDM_ADMIN, IDM_ABOUT, IDM_EXIT };
+enum { IDM_AUTO = 1, IDM_ADMIN, IDM_UPDATE, IDM_ABOUT, IDM_EXIT };
+enum { WM_APP_UPDATE = WM_APP + 7, TIMER_TICK = 1, TIMER_UPDATE = 2 };
 
 NtQSI_t NtQSI;
 HWND hMain, hPop;
 int popMode;
 ULONGLONG tickPrev, tickNow;
 static UINT wmTaskbar, wmQuit;
+static WCHAR updLatest[64];                              // newer version found by the background check, or empty
+static BOOL updBusy;                                     // a background check is running
+
+static void CheckUpdates() {                             // the updater itself skips it until check_interval_hours pass
+    if (!updBusy) updBusy = IlizUpdaterCheckAsync(hMain, WM_APP_UPDATE, L"--if-due");
+}
+
+static void OnUpdateInfo(IlizUpdateInfo *u) {
+    updBusy = FALSE;
+    if (!u) return;
+    if (u->exitCode == ILIZ_UPD_UPDATE_AVAILABLE && u->latest[0])
+        MultiByteToWideChar(CP_UTF8, 0, u->latest, -1, updLatest, 64);
+    else if (u->exitCode == ILIZ_UPD_OK) updLatest[0] = 0;
+    IlizUpdaterFree(u);
+}
+
+static void LaunchUpdater(HWND h) {                      // interactive: shows versions and notes, asks, then closes us
+    if (!IlizUpdaterLaunch(FALSE))
+        MessageBoxW(h, L"Не удалось запустить iliz_updater.exe. Он должен лежать рядом с программой.",
+                    APP_NAME, MB_OK | MB_ICONWARNING | MB_TOPMOST);
+}
 
 static void ShowAbout(HWND h) {
     WCHAR t[256];
@@ -33,6 +56,12 @@ static void ShowMenu(HWND h, int x, int y) {
     BOOL autoOn = AutostartEnabled(), elev = IsElevated();
     AppendMenuW(menu, MF_STRING | (autoOn ? MF_CHECKED : 0), IDM_AUTO, L"Запускать с Windows");
     if (!elev) AppendMenuW(menu, MF_STRING, IDM_ADMIN, L"Перезапустить от администратора");
+    WCHAR updPath[MAX_PATH], updText[96];
+    if (IlizUpdaterPath(updPath, MAX_PATH)) {            // no updater next to the exe (dev build): no menu item
+        if (updLatest[0]) wsprintfW(updText, L"Обновить до v%s", updLatest);
+        else lstrcpyW(updText, L"Проверить обновления");
+        AppendMenuW(menu, MF_STRING, IDM_UPDATE, updText);
+    }
     AppendMenuW(menu, MF_SEPARATOR, 0, 0);
     AppendMenuW(menu, MF_STRING, IDM_ABOUT, APP_NAME L" v" APP_VERSION);
     AppendMenuW(menu, MF_SEPARATOR, 0, 0);
@@ -43,13 +72,15 @@ static void ShowMenu(HWND h, int x, int y) {
     PostMessageW(h, WM_NULL, 0, 0);
     if (cmd == IDM_ABOUT) ShowAbout(h);
     else if (cmd == IDM_AUTO) AutostartSet(!autoOn);
+    else if (cmd == IDM_UPDATE) LaunchUpdater(h);
     else if (cmd == IDM_ADMIN) RelaunchElevated();          // the elevated instance asks us to quit
     else if (cmd == IDM_EXIT) DestroyWindow(h);
 }
 
 static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
     switch (m) {
-    case WM_TIMER: AppTick(); return 0;
+    case WM_TIMER: if (w == TIMER_UPDATE) CheckUpdates(); else AppTick(); return 0;
+    case WM_APP_UPDATE: OnUpdateInfo((IlizUpdateInfo*)l); return 0;
     case WM_TRAY:                                        // NOTIFYICON_VERSION_4: event in LOWORD(l), icon id in HIWORD(l)
         switch (LOWORD(l)) {
         case NIN_POPUPOPEN:  ShowPopup(HIWORD(l)); break;
@@ -98,7 +129,10 @@ int WINAPI wWinMain(HINSTANCE hi, HINSTANCE, PWSTR, int) {
     tickNow = GetTickCount64();
     AppSample();                                         // baseline: lists are ready after the first tick
     AddIcons();
-    SetTimer(hMain, 1, 1000, 0);
+    SetTimer(hMain, TIMER_TICK, 1000, 0);
+    IlizUpdaterWatchQuit(hMain, WM_CLOSE);               // the updater asks us to exit before installing
+    CheckUpdates();
+    SetTimer(hMain, TIMER_UPDATE, 6 * 3600 * 1000, 0);
     MSG msg;
     while (GetMessageW(&msg, 0, 0, 0) > 0) DispatchMessageW(&msg);
     return 0;
