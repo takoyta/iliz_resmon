@@ -1,4 +1,4 @@
-// Metric history: per-second ring buffers for an hour (~25 KB), see history.h.
+// Metric history: per-second ring buffers for 5 minutes (~2.7 KB), see history.h.
 #include "common.h"
 #include "history.h"
 #include "cpu.h"
@@ -8,8 +8,8 @@
 #include "gpu.h"
 
 #define NS (H_PCT_N + H_NET_N)
-static BYTE pct[H_PCT_N][HLONG];
-static USHORT net[H_NET_N][HLONG];
+static BYTE pct[H_PCT_N][HISTN];
+static USHORT net[H_NET_N][HISTN];
 static int hn, hpos;                       // stored count, next write slot
 static LONGLONG acc[NS]; static int cnt;   // ticks of the current second
 static ULONGLONG sec;                      // tickNow / 1000 of acc
@@ -20,8 +20,8 @@ static ULONG Dec(USHORT c) { return (ULONG)(c & 2047) << (c >> 11); }
 static void Store(const LONGLONG *v) {
     for (int m = 0; m < H_PCT_N; m++) pct[m][hpos] = (BYTE)(v[m] < 0 ? 0 : v[m] > 100 ? 100 : v[m]);
     for (int m = 0; m < H_NET_N; m++) { LONGLONG x = v[H_PCT_N + m]; net[m][hpos] = Enc((ULONG)(x < 0 ? 0 : x > 0xFFFFFFFF ? 0xFFFFFFFF : x)); }
-    hpos = (hpos + 1) % HLONG;
-    if (hn < HLONG) hn++;
+    hpos = (hpos + 1) % HISTN;
+    if (hn < HISTN) hn++;
 }
 
 void PushHistory() {
@@ -29,7 +29,7 @@ void PushHistory() {
     if (cnt && s != sec) {                               // second over: store it (repeat for skipped seconds)
         LONGLONG v[NS], zero[NS] = {0};
         for (int i = 0; i < NS; i++) v[i] = i == H_CPUMAX ? acc[i] : acc[i] / cnt;
-        ULONGLONG gap = s - sec; if (gap > HLONG) gap = HLONG;
+        ULONGLONG gap = s - sec; if (gap > HISTN) gap = HISTN;
         Store(v);
         for (ULONGLONG k = 1; k < gap; k++) Store(gap <= 5 ? v : zero);   // long gap = sleep: leave it empty
         ZeroMemory(acc, sizeof(acc)); cnt = 0;
@@ -46,5 +46,5 @@ void PushHistory() {
 }
 
 int HistLen() { return hn; }
-int HistPct(int m, int i) { return pct[m][(hpos - hn + i + HLONG) % HLONG]; }
-ULONG HistNet(int m, int i) { return Dec(net[m][(hpos - hn + i + HLONG) % HLONG]); }
+int HistPct(int m, int i) { return pct[m][(hpos - hn + i + HISTN) % HISTN]; }
+ULONG HistNet(int m, int i) { return Dec(net[m][(hpos - hn + i + HISTN) % HISTN]); }

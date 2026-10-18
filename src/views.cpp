@@ -16,7 +16,7 @@
 enum { F_PCT10, F_BYTES, F_RATE };         // value formats
 
 static int g1[HISTN], g2[HISTN];           // graph scratch
-static int Last() { int n = HistLen(); return n < HISTN ? n : HISTN; }   // popup graphs: last HISTN seconds
+static int Last() { return HistLen(); }   // popup graphs: last HISTN seconds
 static int Pct(int m, int *o) { int n = Last(), b = HistLen() - n; for (int i = 0; i < n; i++) o[i] = HistPct(m, b + i) * 10; return n; }
 
 int ViewWidth(int mode) { return mode == ID_GPU ? SC(260) : mode == ID_NET ? SC(520) : mode == ID_DISK ? SC(330) : mode == ID_MEM ? SC(300) : SC(240); }

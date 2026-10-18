@@ -17,7 +17,6 @@ The UI is in English or Russian, picked from the Windows display language (Russi
 - **Disks**: one entry per physical drive with its volume letters (`Samsung SSD 980 PRO [C:]`): activity, read and write speed, queue length, free space, and the processes loading each drive.
 - **Network**: download and upload speed, a 5-minute graph, and the top 10 processes by traffic with their current speed and today's totals (reset at midnight).
 - **GPU** (off by default, enable it in the configurator): load from the `GPU Engine` performance counters (busiest engine type, as in Task Manager), a scrolling graph icon, and a popup with a 5-minute graph and the busiest engine types. No admin rights needed.
-- **History window**: a left click on any tray icon opens a resizable window with the last 60 minutes of that metric (one sample per second, peak values per pixel column). Esc closes it.
 - Processes that drop out of a top list stay visible in grey for 5 seconds, so you have time to see what it was.
 - DPI-aware (per-monitor v2), with correct popup placement, including icons in the hidden-icons flyout.
 - **Settings**: the tray menu item **Settings…** opens `iliz_resmon_config.exe`, a small dialog where you choose which tray icons to show (CPU, memory, disks, network, GPU), the update interval (0.5, 1 or 2 s) and whether to start with Windows. Changes apply immediately; at least one icon stays on.
@@ -70,8 +69,7 @@ You need Visual Studio 2022 Build Tools with the C++ workload. Run `build.bat`: 
 | `cpu.cpp`, `mem.cpp`, `disk.cpp`, `net.cpp`, `gpu.cpp` | Metric sampling (`gpu.cpp`: PDH, `pdh.dll` loaded only while the GPU icon is on) |
 | `procs.cpp` | Process snapshot (`NtQuerySystemInformation`): top lists by CPU, memory and I/O |
 | `etw.cpp` | Kernel tracing: per-process disk and network activity, automatic session recovery |
-| `history.cpp` | One hour of per-second history (bytes / 16-bit codes) for the graphs |
-| `histwnd.cpp` | 60-minute history window (left click on an icon) |
+| `history.cpp` | 5-minute per-second history (bytes / 16-bit codes) for the graphs |
 | `sticky.cpp` | Rows that dropped out of a top list and stay visible in grey |
 | `trayicon.cpp` | Icon drawing and tray handling |
 | `popup.cpp`, `views.cpp`, `draw.cpp`, `theme.h` | Popups: placement, content, drawing primitives, colors |

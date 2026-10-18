@@ -12,7 +12,6 @@
 #include "history.h"
 #include "trayicon.h"
 #include "popup.h"
-#include "histwnd.h"
 
 void AppInit() { InitCpu(); InitDisks(); EtwInit(); EtwStart(); }
 
@@ -31,5 +30,4 @@ void AppTick() {
     PushHistory();                         // derive: needs CPU, mem, disks, net
     UpdateIcons();                         // render
     if (popMode) PopupTick();
-    HistWndTick();
 }
