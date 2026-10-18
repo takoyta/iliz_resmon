@@ -5,8 +5,8 @@
 
 STLIST stTop[TM_N], stDisk[MAXD];
 
-static void Update(STLIST *l, const STICKY *live, int nLive, int cap) {   // cap <= TOPN
-    static STICKY a[2 * TOPN]; int n = 0;                // static: keep the stack frame small
+static void Update(STLIST *l, const STICKY *live, int nLive, int cap) {   // cap <= TOPN_MAX
+    static STICKY a[2 * TOPN_MAX]; int n = 0;                // static: keep the stack frame small
     for (int i = 0; i < nLive && i < cap; i++) {
         a[n] = live[i]; a[n].seen = tickNow; a[n].live = 1;
         a[n].peakV = a[n].v; n++;
@@ -41,7 +41,7 @@ static void Row(STICKY *a, DWORD pid, const WCHAR *name, LONGLONG v) {
 }
 
 void StickyTick() {
-    static STICKY a[TOPN];
+    static STICKY a[TOPN_MAX];
     for (int m = 0; m < TM_N; m++) {
         for (int i = 0; i < nTop[m]; i++) Row(&a[i], top[m][i].pid, top[m][i].name, top[m][i].v);
         Update(&stTop[m], a, nTop[m], TOPN);

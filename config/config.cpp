@@ -19,6 +19,7 @@ static void Load(HWND d) {
     int v[5] = {s.cpu, s.mem, s.disk, s.net, s.gpu};
     if (!v[0] && !v[1] && !v[2] && !v[3] && !v[4]) v[0] = 1;
     for (int i = 0; i < 5; i++) CheckDlgButton(d, ids[i], v[i] ? BST_CHECKED : BST_UNCHECKED);
+    SendDlgItemMessageW(d, IDC_TOPN, CB_SETCURSEL, s.topn - 3, 0);      // items 3..15
     for (int i = 0; i < 3; i++) if (intervals[i] == s.interval) SendDlgItemMessageW(d, IDC_INTERVAL, CB_SETCURSEL, i, 0);
     CheckDlgButton(d, IDC_AUTO, AutostartEnabled() ? BST_CHECKED : BST_UNCHECKED);
 }
@@ -33,7 +34,8 @@ static void OnAutostart(HWND d) {                        // HKCU Run: same user 
 
 static void Save(HWND d, const int *v) {                 // v: icon checkboxes in ids[] order
     int sel = (int)SendDlgItemMessageW(d, IDC_INTERVAL, CB_GETCURSEL, 0, 0);
-    Settings s = {v[0], v[1], v[2], v[3], intervals[sel >= 0 && sel < 3 ? sel : 1], v[4]};
+    int tn = (int)SendDlgItemMessageW(d, IDC_TOPN, CB_GETCURSEL, 0, 0);
+    Settings s = {v[0], v[1], v[2], v[3], intervals[sel >= 0 && sel < 3 ? sel : 1], v[4], tn >= 0 ? tn + 3 : 10};
     if (!SaveSettings(&s)) {
         MessageBoxW(d, T(S_CFG_SAVE_FAIL),
                     L"iliz resmon", MB_OK | MB_ICONWARNING);
@@ -68,6 +70,8 @@ static void Texts(HWND d) {                              // the template is Engl
     SetDlgItemTextW(d, IDC_AUTO, T(S_CFG_AUTO));
     SetDlgItemTextW(d, IDC_INTERVAL_LBL, T(S_CFG_INTERVAL));
     for (int i = 0; i < 3; i++) SendDlgItemMessageW(d, IDC_INTERVAL, CB_ADDSTRING, 0, (LPARAM)T(S_CFG_I500 + i));
+    SetDlgItemTextW(d, IDC_TOPN_LBL, T(S_CFG_TOPN));
+    for (int i = 3; i <= 15; i++) { WCHAR n[4]; wsprintfW(n, L"%d", i); SendDlgItemMessageW(d, IDC_TOPN, CB_ADDSTRING, 0, (LPARAM)n); }
     SetDlgItemTextW(d, IDOK, T(S_CFG_CLOSE));
 }
 
@@ -76,7 +80,7 @@ static INT_PTR CALLBACK DlgProc(HWND d, UINT m, WPARAM w, LPARAM) {
     case WM_INITDIALOG: Texts(d); Load(d); return TRUE;
     case WM_COMMAND:
         if (LOWORD(w) == IDOK || LOWORD(w) == IDCANCEL) { EndDialog(d, 0); return TRUE; }
-        if (HIWORD(w) == CBN_SELCHANGE && LOWORD(w) == IDC_INTERVAL) { int v[5]; Icons(d, v); Save(d, v); return TRUE; }
+        if (HIWORD(w) == CBN_SELCHANGE && (LOWORD(w) == IDC_INTERVAL || LOWORD(w) == IDC_TOPN)) { int v[5]; Icons(d, v); Save(d, v); return TRUE; }
         if (HIWORD(w) == BN_CLICKED && LOWORD(w) == IDC_AUTO) { OnAutostart(d); return TRUE; }
         if (HIWORD(w) == BN_CLICKED && ((LOWORD(w) >= IDC_CPU && LOWORD(w) <= IDC_NET) || LOWORD(w) == IDC_GPU)) { OnToggle(d, LOWORD(w)); return TRUE; }
         break;

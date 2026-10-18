@@ -12,14 +12,14 @@ The UI is in English or Russian, picked from the Windows display language (Russi
 
 ## Features
 
-- **CPU**: a tray icon with one bar per core (cores are grouped when there are more cores than pixels). The popup shows a 5-minute graph (average load and the busiest core) and the top 10 processes.
-- **Memory**: used and available memory, cache, commit charge, a 5-minute graph, and the top 10 processes by private working set.
+- **CPU**: a tray icon with one bar per core (cores are grouped when there are more cores than pixels). The popup shows a 5-minute graph (average load and the busiest core) and the top processes (10 by default).
+- **Memory**: used and available memory, cache, commit charge, a 5-minute graph, and the top processes (10 by default) by private working set.
 - **Disks**: one entry per physical drive with its volume letters (`Samsung SSD 980 PRO [C:]`): activity, read and write speed, queue length, free space, and the processes loading each drive.
-- **Network**: download and upload speed, a 5-minute graph, and the top 10 processes by traffic with their current speed and today's totals (reset at midnight).
+- **Network**: download and upload speed, a 5-minute graph, and the top processes (10 by default) by traffic with their current speed and today's totals (reset at midnight).
 - **GPU** (off by default, enable it in the configurator): load from the `GPU Engine` performance counters (busiest engine type, as in Task Manager), plus video memory use (`GPU Adapter Memory` counters against the DXGI memory size, matched by adapter LUID). The scrolling graph icon shows load as columns and video memory as a cyan line; the popup shows `VRAM: used / total (N%)`, a 5-minute graph with both (with a legend), the busiest engine types and the top processes by video memory. Memory follows the adapter that carries the load. Integrated GPUs (less than 512 MB dedicated) show shared system memory instead. No admin rights needed.
 - Processes that drop out of a top list stay visible in grey for 5 seconds, so you have time to see what it was.
 - DPI-aware (per-monitor v2), with correct popup placement, including icons in the hidden-icons flyout.
-- **Settings**: the tray menu item **Settings…** opens `iliz_resmon_config.exe`, a small dialog where you choose which tray icons to show (CPU, memory, disks, network, GPU), the update interval (0.5, 1 or 2 s) and whether to start with Windows. Changes apply immediately; at least one icon stays on.
+- **Settings**: the tray menu item **Settings…** opens `iliz_resmon_config.exe`, a small dialog where you choose which tray icons to show (CPU, memory, disks, network, GPU), the update interval (0.5, 1 or 2 s), how many process rows the popups show (3 to 15) and whether to start with Windows. Changes apply immediately; at least one icon stays on.
 - Autostart (the **Start with Windows** checkbox in the configurator) through `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, with no admin rights needed.
 
 ## Administrator rights
@@ -40,9 +40,10 @@ disk=1
 net=1
 gpu=0
 interval_ms=1000
+top_n=10
 ```
 
-A missing file or key means "on" for `cpu`/`mem`/`disk`/`net`, "off" for `gpu`, and 1000 ms for `interval_ms` (500, 1000 or 2000). `iliz_resmon_config.exe` writes the file and posts the registered window message `iliz_resmon_reload` to the running iliz resmon, which rereads the file, re-adds only the enabled icons and restarts its timer with the new interval (the message is allowed through UIPI, so it works when iliz resmon runs as administrator). The ini is not part of the release zip and is listed in `preserve` in `iliz_updater.json`, so updates keep your settings.
+A missing file or key means "on" for `cpu`/`mem`/`disk`/`net`, "off" for `gpu`, 1000 ms for `interval_ms` (500, 1000 or 2000) and 10 for `top_n` (3 to 15). `top_n` is the length of the CPU, memory, network and disk-fallback process lists; the per-disk lists get 2/5 of it (4 at 10) and the GPU engine and video-memory lists half (5 at 10). Popup heights follow. `iliz_resmon_config.exe` writes the file and posts the registered window message `iliz_resmon_reload` to the running iliz resmon, which rereads the file, re-adds only the enabled icons and restarts its timer with the new interval (the message is allowed through UIPI, so it works when iliz resmon runs as administrator). The ini is not part of the release zip and is listed in `preserve` in `iliz_updater.json`, so updates keep your settings.
 
 ## Updates
 

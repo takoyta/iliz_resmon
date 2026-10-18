@@ -19,6 +19,7 @@ enum { WM_APP_UPDATE = WM_APP + 7, TIMER_TICK = 1, TIMER_UPDATE = 2 };
 NtQSI_t NtQSI;
 HWND hMain, hPop;
 int popMode;
+int topN = 10;                                           // from iliz_resmon.ini, see trayicon.cpp
 ULONGLONG tickPrev, tickNow;
 static UINT wmTaskbar, wmQuit, wmReload;
 static WCHAR updLatest[64];                              // newer version found by the background check, or empty

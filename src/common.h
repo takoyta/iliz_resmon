@@ -5,7 +5,10 @@
 #include <windows.h>
 
 #define WM_TRAY (WM_APP + 1)
-#define TOPN 10                            // process list length
+#define TOPN_MIN 3                         // process list length: [tray] top_n, 3..15, default 10
+#define TOPN_MAX 15
+#define TOPN topN                          // rows of the main process lists (CPU, memory, I/O, network)
+extern int topN;
 #define MAXD 16                            // physical disks
 #define NAME_LEN 32                        // process name buffer (incl. 0)
 enum { ID_CPU = 1, ID_DISK, ID_NET, ID_MEM, ID_GPU };   // tray icon ids = popup modes

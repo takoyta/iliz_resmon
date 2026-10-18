@@ -1,5 +1,6 @@
 // User settings in iliz_resmon.ini next to the exe. Shared by iliz_resmon.exe and iliz_resmon_config.exe.
-// [tray] cpu/mem/disk/net = 1/0 (missing = on), gpu = 1/0 (missing = off), interval_ms = 500/1000/2000 (default 1000).
+// [tray] cpu/mem/disk/net = 1/0 (missing = on), gpu = 1/0 (missing = off), interval_ms = 500/1000/2000 (default 1000),
+// top_n = process rows in the popups, 3..15 (default 10).
 #pragma once
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -9,8 +10,9 @@
 #define SETTINGS_RELOAD_MSG L"iliz_resmon_reload"   // registered message: "reread the ini"
 #define SETTINGS_WND_CLASS  L"iliz_resmon"          // main window class (APP_ID)
 
-typedef struct { int cpu, mem, disk, net, interval, gpu; } Settings;   // interval: tick period, ms
+typedef struct { int cpu, mem, disk, net, interval, gpu, topn; } Settings;   // interval: tick period, ms
 
+static inline int SettingsTopN(int v) { return v < 3 ? 3 : v > 15 ? 15 : v; }
 static inline int SettingsInterval(int v) { return v < 750 ? 500 : v < 1500 ? 1000 : 2000; }   // snap to 0.5 / 1 / 2 s
 
 static inline void SettingsDir(WCHAR *p) {          // folder of the running exe, with trailing backslash
@@ -29,6 +31,7 @@ static inline void LoadSettings(Settings *s) {
     s->net  = GetPrivateProfileIntW(L"tray", L"net",  1, p) != 0;
     s->gpu  = GetPrivateProfileIntW(L"tray", L"gpu",  0, p) != 0;
     s->interval = SettingsInterval(GetPrivateProfileIntW(L"tray", L"interval_ms", 1000, p));
+    s->topn = SettingsTopN(GetPrivateProfileIntW(L"tray", L"top_n", 10, p));
 }
 
 static inline BOOL SaveSettings(const Settings *s) {
@@ -41,6 +44,8 @@ static inline BOOL SaveSettings(const Settings *s) {
     ok &= WritePrivateProfileStringW(L"tray", L"gpu",  s->gpu  ? L"1" : L"0", p);
     WCHAR iv[12]; wsprintfW(iv, L"%d", SettingsInterval(s->interval));
     ok &= WritePrivateProfileStringW(L"tray", L"interval_ms", iv, p);
+    wsprintfW(iv, L"%d", SettingsTopN(s->topn));
+    ok &= WritePrivateProfileStringW(L"tray", L"top_n", iv, p);
     WritePrivateProfileStringW(0, 0, 0, p);         // flush the profile cache
     return ok;
 }

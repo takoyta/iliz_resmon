@@ -42,7 +42,7 @@ static void PaintTop(PCTX *c, const STLIST *l, int fmt) {
     WCHAR s[32];
     if (!l->n) Text(c, c->L, c->R, haveBase ? T(S_QUIET) : T(S_MEASURING), c->cDim, DT_LEFT);   // "Измеряю" only before the first tick
     LONGLONG full = fmt == F_PCT10 ? 1000 : l->n ? l->e[0].v : 1;
-    for (int i = 0; i < l->n; i++, c->row++) {
+    for (int i = 0; i < l->n && i < TOPN; i++, c->row++) {   // n may exceed TOPN until the tick after a reload
         const STICKY *e = &l->e[i];
         COLORREF ct = ListRow(c, c->L, c->R - COL_VAL, e->name, e->v, full, 3, e->live);
         if (fmt == F_PCT10) wsprintfW(s, L"%d.%d%%", (int)(e->v / 10), (int)(e->v % 10));
@@ -220,7 +220,7 @@ static void PaintGpu(PCTX *c) {                         // load, VRAM, graph (lo
     c->row = g9 + GPU_ROWS;                              // fixed slots: the list below doesn't move
     Text(c, c->L, c->R, T(S_VRAM_PROCS), C_VRAM, DT_LEFT); c->row++;
     if (!ngproc) Text(c, c->L + SC(8), c->R, ad ? T(S_MEASURING) : T(S_VRAM_NA), c->cDim, DT_LEFT);
-    for (int r = 0; r < ngproc; r++, c->row++) {
+    for (int r = 0; r < ngproc && r < VPROC_ROWS; r++, c->row++) {
         ListRow(c, c->L, c->R - COL_VAL, gproc[r].name, (LONGLONG)gproc[r].bytes, (LONGLONG)gproc[0].bytes, 3, 1);
         FmtBytes(s, gproc[r].bytes);
         Text(c, c->L, c->R - SC(4), s, c->cText, DT_RIGHT);

@@ -8,6 +8,6 @@ typedef struct {
     LONGLONG peakV;                        // max while live; shown by ghost rows
     ULONGLONG seen; int live;              // last tick seen live
 } STICKY;
-typedef struct { STICKY e[TOPN]; int n; } STLIST;  // live + ghost rows sorted by value; ghosts dropped first on overflow
+typedef struct { STICKY e[TOPN_MAX]; int n; } STLIST;  // live + ghost rows sorted by value; ghosts dropped first on overflow
 extern STLIST stTop[TM_N], stDisk[MAXD];   // per-metric process lists, per-disk ETW
 void StickyTick();                         // every tick, after SampleProcs/EtwTick (ghosts survive popup close)

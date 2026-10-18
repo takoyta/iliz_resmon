@@ -9,3 +9,5 @@
 #define IDC_INTERVAL_LBL 107
 #define IDC_INTERVAL 108
 #define IDC_GPU   109
+#define IDC_TOPN_LBL 110
+#define IDC_TOPN  111

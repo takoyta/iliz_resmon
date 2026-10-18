@@ -19,7 +19,7 @@ static PREC *pPrev, *pCur; static int nPrev, cap;        // snapshots, cap entri
 static int *hIdx; static int hMask;                      // pid -> index into pPrev (open addressing, -1 empty)
 static BYTE *pbuf; static ULONG pbufSize;
 int haveBase, nTop[TM_N];
-TOP top[TM_N][TOPN];
+TOP top[TM_N][TOPN_MAX];
 
 static void *Grow(void *p, SIZE_T n) {
     HANDLE h = GetProcessHeap();

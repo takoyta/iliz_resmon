@@ -30,7 +30,7 @@ static const WCHAR *const ctrPath[C_N] = {
 static BYTE *buf; static DWORD bufSize;
 #define IGPU_DEDICATED (512ull << 20)                    // less dedicated memory than this: integrated, show shared
 
-GENG geng[MAXG]; GADAPTER gad[MAXA]; GPROC gproc[VPROC_ROWS];
+GENG geng[MAXG]; GADAPTER gad[MAXA]; GPROC gproc[VPROC_MAX];
 int ngeng, nGpuAd, ngproc, gpuLoad, gpuOk, gpuAd = -1, vramPct;
 
 static void Off() {

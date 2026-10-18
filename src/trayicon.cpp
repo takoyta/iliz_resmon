@@ -13,7 +13,7 @@
 #include "format.h"
 #include "settings.h"
 
-static Settings cfg = {1, 1, 1, 1, 1000, 0};              // which icons are enabled (iliz_resmon.ini)
+static Settings cfg = {1, 1, 1, 1, 1000, 0, 10};              // which icons are enabled (iliz_resmon.ini)
 
 static NOTIFYICONDATAW nidCpu, nidMem, nidDisk, nidNet, nidGpu;
 static HICON icCpu, icMem, icDisk, icNet, icGpu;
@@ -177,6 +177,7 @@ static void Load() {                                     // never end up with no
     LoadSettings(&cfg);
     if (!cfg.cpu && !cfg.mem && !cfg.net && !cfg.gpu && !(cfg.disk && ndisk)) cfg.cpu = 1;
     GpuEnable(cfg.gpu);                                  // pdh.dll only while the GPU icon is shown
+    topN = cfg.topn;                                     // popup heights follow (ViewRows)
 }
 
 void LoadTraySettings() { Load(); }

@@ -52,8 +52,8 @@ static ULONGLONG etwRetryAt, etwCheckAt;
 #define ETW_CHECK_MS 10000
 
 int etwOn, etwState, etwTicks; ULONG etwErr, etwLost;
-DTOP dtop[MAXD][DTOPN]; int ndtop[MAXD];
-NTOP ntop[TOPN]; int nNtop;
+DTOP dtop[MAXD][DTOPN_MAX]; int ndtop[MAXD];
+NTOP ntop[TOPN_MAX]; int nNtop;
 
 static inline UINT Hash(DWORD k) { return (k * 2654435761u) >> 8; }
 
