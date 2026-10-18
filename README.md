@@ -16,7 +16,7 @@ The UI is in English or Russian, picked from the Windows display language (Russi
 - **Memory**: used and available memory, cache, commit charge, a 5-minute graph, and the top 10 processes by private working set.
 - **Disks**: one entry per physical drive with its volume letters (`Samsung SSD 980 PRO [C:]`): activity, read and write speed, queue length, free space, and the processes loading each drive.
 - **Network**: download and upload speed, a 5-minute graph, and the top 10 processes by traffic with their current speed and today's totals (reset at midnight).
-- **GPU** (off by default, enable it in the configurator): load from the `GPU Engine` performance counters (busiest engine type, as in Task Manager), a scrolling graph icon, and a popup with a 5-minute graph and the busiest engine types. No admin rights needed.
+- **GPU** (off by default, enable it in the configurator): load from the `GPU Engine` performance counters (busiest engine type, as in Task Manager), plus video memory use (`GPU Adapter Memory` counters against the DXGI memory size, matched by adapter LUID). The scrolling graph icon shows load as columns and video memory as a cyan line; the popup shows `VRAM: used / total (N%)`, a 5-minute graph with both (with a legend), the busiest engine types and the top processes by video memory. Memory follows the adapter that carries the load. Integrated GPUs (less than 512 MB dedicated) show shared system memory instead. No admin rights needed.
 - Processes that drop out of a top list stay visible in grey for 5 seconds, so you have time to see what it was.
 - DPI-aware (per-monitor v2), with correct popup placement, including icons in the hidden-icons flyout.
 - **Settings**: the tray menu item **Settings…** opens `iliz_resmon_config.exe`, a small dialog where you choose which tray icons to show (CPU, memory, disks, network, GPU), the update interval (0.5, 1 or 2 s) and whether to start with Windows. Changes apply immediately; at least one icon stays on.
@@ -66,7 +66,7 @@ You need Visual Studio 2022 Build Tools with the C++ workload. Run `build.bat`: 
 |---|---|
 | `main.cpp` | Entry point, window, menu, single instance, handoff to the elevated instance |
 | `app.cpp` | Once-a-second loop: sample, process, render |
-| `cpu.cpp`, `mem.cpp`, `disk.cpp`, `net.cpp`, `gpu.cpp` | Metric sampling (`gpu.cpp`: PDH, `pdh.dll` loaded only while the GPU icon is on) |
+| `cpu.cpp`, `mem.cpp`, `disk.cpp`, `net.cpp`, `gpu.cpp` | Metric sampling (`gpu.cpp`: PDH + DXGI, `pdh.dll` and `dxgi.dll` loaded only while the GPU icon is on) |
 | `procs.cpp` | Process snapshot (`NtQuerySystemInformation`): top lists by CPU, memory and I/O |
 | `etw.cpp` | Kernel tracing: per-process disk and network activity, automatic session recovery |
 | `history.cpp` | 5-minute per-second history (bytes / 16-bit codes) for the graphs |

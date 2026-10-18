@@ -67,6 +67,13 @@ static const WCHAR *const en[S_COUNT] = {
     L"Per-process traffic unavailable: tracing is blocked",
     L"\nper-process: needs admin",
     L"\nper-process: tracing blocked",
+    L"\nVRAM: %d%%",
+    L"VRAM: %s / %s (%d%%)",
+    L"VRAM (shared): %s / %s (%d%%)",
+    L"VRAM: no data",
+    L"load",
+    L"VRAM",
+    L"Processes by VRAM",
 };
 
 static const WCHAR *const ru[S_COUNT] = {
@@ -135,6 +142,13 @@ static const WCHAR *const ru[S_COUNT] = {
     L"Трафик по процессам недоступен: трассировка заблокирована",
     L"\nпо процессам: нужен админ",
     L"\nпо процессам: трассировка заблокирована",
+    L"\nВидеопамять: %d%%",
+    L"Видеопамять: %s / %s (%d%%)",
+    L"Видеопамять (общая): %s / %s (%d%%)",
+    L"Видеопамять: нет данных",
+    L"загрузка",
+    L"видеопамять",
+    L"Процессы по видеопамяти",
 };
 
 const WCHAR *T(int id) {

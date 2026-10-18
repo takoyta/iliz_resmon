@@ -19,11 +19,11 @@ static int g1[HISTN], g2[HISTN];           // graph scratch
 static int Last() { return HistLen(); }   // popup graphs: last HISTN seconds
 static int Pct(int m, int *o) { int n = Last(), b = HistLen() - n; for (int i = 0; i < n; i++) o[i] = HistPct(m, b + i) * 10; return n; }
 
-int ViewWidth(int mode) { return mode == ID_GPU ? SC(260) : mode == ID_NET ? SC(520) : mode == ID_DISK ? SC(330) : mode == ID_MEM ? SC(300) : SC(240); }
+int ViewWidth(int mode) { return mode == ID_GPU ? SC(320) : mode == ID_NET ? SC(520) : mode == ID_DISK ? SC(330) : mode == ID_MEM ? SC(300) : SC(240); }
 
 int ViewRows(int mode) {
     if (mode == ID_CPU) return 1 + GRAPH_ROWS + TOPN;
-    if (mode == ID_GPU) return 1 + GRAPH_ROWS + GPU_ROWS;
+    if (mode == ID_GPU) return 2 + GRAPH_ROWS + GPU_ROWS + 1 + VPROC_ROWS;
     if (mode == ID_MEM) return 5 + GRAPH_ROWS + (mem.cache ? 1 : 0) + TOPN;
     if (mode == ID_NET) return 2 * (nnic ? nnic : 1) + GRAPH_ROWS + (etwOn ? 2 + TOPN : 1);
     int r = 0;
@@ -187,11 +187,22 @@ static void PaintNet(PCTX *c) {
     for (int i = 0; i < nNtop; i++) NetRow(c, &ntop[i], full);
 }
 
-static void PaintGpu(PCTX *c) {                         // load, graph, busiest engine types
-    WCHAR s[64];
+static void PaintGpu(PCTX *c) {                         // load, VRAM, graph (load + VRAM line), engine types, VRAM processes
+    WCHAR s[96], a[24], b[24];
     wsprintfW(s, T(S_GPU_HDR), gpuLoad);
     Text(c, c->L, c->R, s, c->cMain, DT_LEFT); c->row++;
-    PaintGraph(c, g1, 0, Pct(H_GPU, g1), 0, 0, L"100%");
+    const GADAPTER *ad = gpuAd >= 0 && gad[gpuAd].total ? &gad[gpuAd] : 0;
+    if (ad) { FmtBytes(a, ad->used); FmtBytes(b, ad->total); wsprintfW(s, T(ad->shared ? S_VRAM_LINE_SH : S_VRAM_LINE), a, b, vramPct); }
+    else lstrcpyW(s, T(S_VRAM_NA));
+    Text(c, c->L, c->R, s, ad ? C_VRAM : c->cDim, DT_LEFT); c->row++;
+    int g0 = c->row;
+    Pct(H_VRAM, g2);
+    PaintGraph(c, g1, g2, Pct(H_GPU, g1), C_VRAM, 1, L"100%");
+    int g9 = c->row; c->row = g0;                        // legend in the graph's top-left corner
+    SIZE sz; GetTextExtentPoint32W(c->dc, T(S_LEG_LOAD), lstrlenW(T(S_LEG_LOAD)), &sz);
+    Text(c, c->L + SC(4), c->R, T(S_LEG_LOAD), c->cMain, DT_LEFT);
+    Text(c, c->L + SC(14) + sz.cx, c->R, T(S_LEG_VRAM), C_VRAM, DT_LEFT);
+    c->row = g9;
     if (!gpuOk || !ngeng) { Text(c, c->L, c->R, gpuOk ? T(S_MEASURING) : T(S_GPU_NONE), c->cDim, DT_LEFT); return; }
     int idx[MAXG], n = 0;
     for (int i = 0; i < ngeng; i++) {                    // sort by load desc (stable: first seen wins ties)
@@ -204,6 +215,14 @@ static void PaintGpu(PCTX *c) {                         // load, graph, busiest 
         if (nGpuAd > 1) wsprintfW(s, L"GPU%d %s", e->ad, e->type); else lstrcpyW(s, e->type);
         ListRow(c, c->L, c->R - COL_VAL, s, e->v, 100, 3, 1);
         wsprintfW(s, L"%d%%", e->v);
+        Text(c, c->L, c->R - SC(4), s, c->cText, DT_RIGHT);
+    }
+    c->row = g9 + GPU_ROWS;                              // fixed slots: the list below doesn't move
+    Text(c, c->L, c->R, T(S_VRAM_PROCS), C_VRAM, DT_LEFT); c->row++;
+    if (!ngproc) Text(c, c->L + SC(8), c->R, ad ? T(S_MEASURING) : T(S_VRAM_NA), c->cDim, DT_LEFT);
+    for (int r = 0; r < ngproc; r++, c->row++) {
+        ListRow(c, c->L, c->R - COL_VAL, gproc[r].name, (LONGLONG)gproc[r].bytes, (LONGLONG)gproc[0].bytes, 3, 1);
+        FmtBytes(s, gproc[r].bytes);
         Text(c, c->L, c->R - SC(4), s, c->cText, DT_RIGHT);
     }
 }

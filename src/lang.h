@@ -72,6 +72,13 @@ enum StrId {
     S_NOTE_BLOCKED,
     S_TIP_ADMIN,
     S_TIP_BLOCKED,
+    S_TIP_VRAM,
+    S_VRAM_LINE,
+    S_VRAM_LINE_SH,
+    S_VRAM_NA,
+    S_LEG_LOAD,
+    S_LEG_VRAM,
+    S_VRAM_PROCS,
     S_COUNT
 };
 

@@ -84,16 +84,25 @@ static HICON DrawMem() {                                 // one wide bar: used %
     return End(&c);
 }
 
-static HICON DrawGpu() {                                 // scrolling graph, one column per tick, newest right
-    static BYTE h[256]; static int pos;                  // ring of recent loads (icon is <= 256 px)
-    h[pos] = (BYTE)gpuLoad; pos = (pos + 1) & 255;
+// Scrolling graph, one column per tick, newest right: GPU load columns + video memory line on top.
+static HICON DrawGpu() {
+    static BYTE h[256], vm[256]; static int pos;         // rings of recent load / VRAM % (icon is <= 256 px)
+    h[pos] = (BYTE)gpuLoad; vm[pos] = (BYTE)(gpuAd >= 0 ? vramPct : 255); pos = (pos + 1) & 255;   // 255: no VRAM data
     CANVAS c; Begin(&c, C_ICON_BG); int S = c.S;
-    HBRUSH b = CreateSolidBrush(C_GPU);
+    int t = S / 12 < 1 ? 1 : S / 12;                     // line thickness: 1 px at 16, 2 px at 24..32
+    HBRUSH b = CreateSolidBrush(C_GPU), bv = CreateSolidBrush(C_VRAM);
+    int py = -1;
     for (int x = 0; x < S; x++) {
-        int v = h[(pos - S + x + 512) & 255], hh = (v * S + 50) / 100; if (v > 0 && hh < 1) hh = 1;
+        int i = (pos - S + x + 512) & 255;
+        int v = h[i], hh = (v * S + 50) / 100; if (v > 0 && hh < 1) hh = 1;
         RECT r = {x, S - hh, x + 1, S}; FillRect(c.dc, &r, b);
+        if (vm[i] > 100) { py = -1; continue; }
+        int y = S - t - (vm[i] * (S - t) + 50) / 100;   // top of the line, stays inside the icon
+        int y0 = py < 0 || py > y ? y : py, y1 = (py < 0 || py < y ? y : py) + t;   // join steps vertically
+        RECT l = {x, y0, x + 1, y1}; FillRect(c.dc, &l, bv);
+        py = y;
     }
-    DeleteObject(b);
+    DeleteObject(b); DeleteObject(bv);
     return End(&c);
 }
 
@@ -130,6 +139,7 @@ static BOOL Update(DWORD msg) {                          // FALSE if any icon is
     }
     if (cfg.gpu) {
     wsprintfW(nidGpu.szTip, T(S_TIP_GPU), gpuLoad);
+    if (gpuAd >= 0 && gad[gpuAd].total) wsprintfW(nidGpu.szTip + lstrlenW(nidGpu.szTip), T(S_TIP_VRAM), vramPct);
     ok &= SetIcon(&nidGpu, &icGpu, DrawGpu(), msg);
     }
     return ok;
