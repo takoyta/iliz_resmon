@@ -12,9 +12,12 @@
 #include "autostart.h"
 #include "iliz_updater_client.h"
 #include "settings.h"
+#include "disk.h"
+#include <dbt.h>
 
 enum { IDM_ADMIN = 1, IDM_CONFIG, IDM_UPDATE, IDM_ABOUT, IDM_EXIT };
-enum { WM_APP_UPDATE = WM_APP + 7, TIMER_TICK = 1, TIMER_UPDATE = 2 };
+enum { WM_APP_UPDATE = WM_APP + 7, TIMER_TICK = 1, TIMER_UPDATE = 2, TIMER_DISKS = 3 };
+#define DISKS_DEBOUNCE_MS 2000                           // device events come in bursts
 
 NtQSI_t NtQSI;
 HWND hMain, hPop;
@@ -91,7 +94,20 @@ static void ShowMenu(HWND h, int x, int y) {
 
 static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
     switch (m) {
-    case WM_TIMER: if (w == TIMER_UPDATE) CheckUpdates(); else AppTick(); return 0;
+    case WM_TIMER:
+        if (w == TIMER_UPDATE) CheckUpdates();
+        else if (w == TIMER_DISKS) {                     // disks / volumes changed: enumerate again
+            KillTimer(h, TIMER_DISKS);
+            int had = ndisk > 0;
+            ReinitDisks();
+            if (had != (ndisk > 0)) { if (popMode == ID_DISK) HidePopup(); RemoveIcons(); AddIcons(); }   // disk icon appears / goes
+        }
+        else AppTick();
+        return 0;
+    case WM_DEVICECHANGE:                                // volume or device arrival / removal (broadcast to top-level windows)
+        if (w == DBT_DEVICEARRIVAL || w == DBT_DEVICEREMOVECOMPLETE || w == DBT_DEVNODES_CHANGED)
+            SetTimer(h, TIMER_DISKS, DISKS_DEBOUNCE_MS, 0);   // restarts on every event: one rescan per burst
+        return TRUE;
     case WM_APP_UPDATE: OnUpdateInfo((IlizUpdateInfo*)l); return 0;
     case WM_TRAY:                                        // NOTIFYICON_VERSION_4: event in LOWORD(l), icon id in HIWORD(l)
         switch (LOWORD(l)) {

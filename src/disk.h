@@ -9,4 +9,5 @@ typedef struct {
 extern DISK disks[MAXD];
 extern int ndisk;
 void InitDisks();
+void ReinitDisks();                        // after WM_DEVICECHANGE (debounced): close handles, enumerate again
 void SampleDisks();
