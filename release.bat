@@ -10,7 +10,7 @@ if not exist "%ILIZ_UPDATER_EXE%" (
   exit /b 1
 )
 
-call "%ROOT%build.bat" || exit /b 1
+call "%ROOT%build.bat" norun || exit /b 1
 
 set VER=
 for /f "tokens=3" %%a in ('findstr /C:"#define APP_VERSION_A" "%ROOT%src\version.h"') do set VER=%%~a

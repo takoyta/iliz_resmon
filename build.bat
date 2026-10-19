@@ -27,3 +27,5 @@ copy /y iliz_updater.json bin\ >nul
 if not defined ILIZ_UPDATER_EXE set ILIZ_UPDATER_EXE=%ROOT%..\iliz_updater\bin\iliz_updater.exe
 if exist "%ILIZ_UPDATER_EXE%" copy /y "%ILIZ_UPDATER_EXE%" bin\iliz_updater.exe >nul
 echo Built: %ROOT%bin\iliz_resmon.exe, %ROOT%bin\iliz_resmon_config.exe
+rem Start the fresh build elevated (UAC prompt; ETW needs admin). Pass 'norun' to skip.
+if /i not "%~1"=="norun" powershell -NoProfile -Command "Start-Process -Verb RunAs -FilePath '%ROOT%bin\iliz_resmon.exe'"
