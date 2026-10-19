@@ -13,6 +13,7 @@
 #include "iliz_updater_client.h"
 #include "settings.h"
 #include "disk.h"
+#include "sticky.h"
 #include "draw.h"
 #include <dbt.h>
 
@@ -100,7 +101,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         else if (w == TIMER_DISKS) {                     // disks / volumes changed: enumerate again
             KillTimer(h, TIMER_DISKS);
             int had = ndisk > 0;
-            ReinitDisks();
+            ReinitDisks(); StickyResetDisks();           // per-disk ghost rows belong to the old indexes
             if (had != (ndisk > 0)) { if (popMode == ID_DISK) HidePopup(); TraySync(); }   // disk icon appears / goes
         }
         else AppTick();

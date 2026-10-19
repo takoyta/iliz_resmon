@@ -27,7 +27,7 @@ int ViewRows(int mode) {
     if (mode == ID_MEM) return 5 + GRAPH_ROWS + (mem.cache ? 1 : 0) + TOPN;
     if (mode == ID_NET) return 2 * (nnic ? nnic : 1) + GRAPH_ROWS + (etwOn ? 2 + TOPN : 1);
     int r = 0;
-    for (int i = 0; i < ndisk; i++) r += 2 + lstrlenW(disks[i].letters);
+    for (int i = 0; i < ndisk; i++) r += 2 + lstrlenW(disks[i].letters) + (etwOn ? DTOPN : 0);   // + per-disk processes
     return r + 1 + TOPN;                                 // + process table (header + rows)
 }
 
@@ -122,6 +122,17 @@ static void Table2(PCTX *c, const PTAB *t, const WCHAR *title, const WCHAR *empt
     }
 }
 
+static void DiskProcs(PCTX *c, const STLIST *l) {      // trace only: DTOPN rows reserved; read | write rate columns
+    int x[5]; Table2Cols(c, x); WCHAR s[24]; int x0 = c->L + SC(8);   // rates line up with the table's speed columns
+    for (int k = 0; k < DTOPN; k++, c->row++) {
+        if (k >= l->n) { if (!k) Text(c, x0 + SC(4), c->R, T(S_SILENCE), c->cDim, DT_LEFT); continue; }
+        const STICKY *e = &l->e[k];                      // ghosts: r / w at their peak
+        COLORREF ct = ListRow2(c, x0, x[0] - SC(6), e->name, e->r, e->w, l->e[0].v, 4, e->live);
+        FmtRate(s, e->r); Text(c, x[0], x[1] - SC(6), s, ct, DT_RIGHT);
+        FmtRate(s, e->w); Text(c, x[1], x[2] - SC(10), s, e->live ? C_TX : C_GHOST, DT_RIGHT);
+    }
+}
+
 static void PaintDisk(PCTX *c) {
     WCHAR s[160], a[32], b[32];
     for (int i = 0; i < ndisk; i++) {
@@ -143,6 +154,7 @@ static void PaintDisk(PCTX *c) {
         wsprintfW(s, T(S_DISK_LINE), a, b, d->queue);
         Text(c, c->L + SC(8), c->R, s, c->cText, DT_LEFT); c->row++;
         for (WCHAR *lt = d->letters; *lt; lt++) PaintVolume(c, *lt);
+        if (etwOn) DiskProcs(c, &stDisk[i]);
     }
     // Daily per-process totals: physical disk I/O from the trace; without it (not elevated / blocked)
     // the process I/O counters, which also count files in cache, devices and network.
