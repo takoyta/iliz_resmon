@@ -2,6 +2,9 @@
 #include <winver.h>
 #include "version.h"
 
+// Win10+ (no version-lie shims), asInvoker. Per-monitor v2 DPI is set in code (wWinMain).
+1 24 "app.manifest"
+
 1 VERSIONINFO
 FILEVERSION     APP_VERSION_NUM
 PRODUCTVERSION  APP_VERSION_NUM
