@@ -5,7 +5,8 @@
 typedef struct {
     DWORD pid; WCHAR name[NAME_LEN];
     LONGLONG v;                            // sort value (rate / %·10 / bytes)
-    LONGLONG peakV;                        // max while live; shown by ghost rows
+    LONGLONG r, w;                         // I/O lists: read / write part of v (bytes/s), else 0
+    LONGLONG peakV, peakR, peakW;          // max v while live (with its r/w); shown by ghost rows
     ULONGLONG seen; int live;              // last tick seen live
 } STICKY;
 typedef struct { STICKY e[TOPN_MAX]; int n; } STLIST;  // live + ghost rows sorted by value; ghosts dropped first on overflow

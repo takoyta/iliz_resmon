@@ -19,7 +19,7 @@ static int g1[HISTN], g2[HISTN];           // graph scratch
 static int Last() { return HistLen(); }   // popup graphs: last HISTN seconds
 static int Pct(int m, int *o) { int n = Last(), b = HistLen() - n; for (int i = 0; i < n; i++) o[i] = HistPct(m, b + i) * 10; return n; }
 
-int ViewWidth(int mode) { return mode == ID_GPU ? SC(320) : mode == ID_NET ? SC(520) : mode == ID_DISK ? SC(330) : mode == ID_MEM ? SC(300) : SC(240); }
+int ViewWidth(int mode) { return mode == ID_GPU ? SC(320) : mode == ID_NET ? SC(520) : mode == ID_DISK ? SC(380) : mode == ID_MEM ? SC(300) : SC(240); }
 
 int ViewRows(int mode) {
     if (mode == ID_CPU) return 1 + GRAPH_ROWS + TOPN;
@@ -27,7 +27,7 @@ int ViewRows(int mode) {
     if (mode == ID_MEM) return 5 + GRAPH_ROWS + (mem.cache ? 1 : 0) + TOPN;
     if (mode == ID_NET) return 2 * (nnic ? nnic : 1) + GRAPH_ROWS + (etwOn ? 2 + TOPN : 1);
     int r = 0;
-    for (int i = 0; i < ndisk; i++) r += 2 + lstrlenW(disks[i].letters) + (etwOn ? DTOPN : 0);
+    for (int i = 0; i < ndisk; i++) r += 2 + lstrlenW(disks[i].letters) + (etwOn ? 1 + DTOPN : 0);   // + read/write header
     return etwOn ? r : r + 1 + TOPN;
 }
 
@@ -98,14 +98,27 @@ static void PaintVolume(PCTX *c, WCHAR letter) {
     c->row++;
 }
 
-static void PaintDiskProcs(PCTX *c, const STLIST *l) {  // ETW per-disk list, DTOPN rows reserved
-    WCHAR s[32]; int x0 = c->L + SC(8);
+// I/O process rows: name + bar (total), then "read" and "write" rate columns, right-aligned.
+#define COL_RW SC(78)                      // width of one rate column ("999.9 MB/s" at any DPI)
+static void RwHeader(PCTX *c) {                          // column labels on the current row (no row advance)
+    int R = c->R - SC(4);
+    Text(c, R - 2 * COL_RW, R - COL_RW, T(S_COL_READ), c->cDim, DT_RIGHT);
+    Text(c, R - COL_RW, R, T(S_COL_WRITE), c->cDim, DT_RIGHT);
+}
+
+static void RwRow(PCTX *c, int x0, const STICKY *e, LONGLONG full, int inset) {
+    WCHAR s[32]; int R = c->R - SC(4);
+    COLORREF ct = ListRow(c, x0, R - 2 * COL_RW - SC(4), e->name, e->v, full, inset, e->live);
+    FmtRate(s, e->r); Text(c, R - 2 * COL_RW, R - COL_RW, s, ct, DT_RIGHT);
+    FmtRate(s, e->w); Text(c, R - COL_RW, R, s, ct, DT_RIGHT);
+}
+
+static void PaintDiskProcs(PCTX *c, const STLIST *l) {  // ETW per-disk list: header + DTOPN rows reserved
+    int x0 = c->L + SC(8);
+    RwHeader(c); c->row++;
     for (int k = 0; k < DTOPN; k++, c->row++) {
         if (k >= l->n) { if (!k) Text(c, x0, c->R, T(S_DPROC_QUIET), c->cDim, DT_LEFT); continue; }
-        const STICKY *e = &l->e[k];
-        COLORREF ct = ListRow(c, x0, c->R - COL_VAL, e->name, e->v, l->e[0].v, 4, e->live);
-        FmtRate(s, e->v);
-        Text(c, c->L, c->R - SC(4), s, ct, DT_RIGHT);
+        RwRow(c, x0, &l->e[k], l->e[0].v, 4);
     }
 }
 
@@ -134,8 +147,10 @@ static void PaintDisk(PCTX *c) {
     }
     if (etwOn) return;
     // Fallback while the trace is down (e.g. blocked by an anti-cheat): all process I/O incl. network.
-    Text(c, c->L, c->R, T(S_PROCS), c->cMain, DT_LEFT); c->row++;
-    PaintTop(c, &stTop[TM_IO], F_RATE);
+    const STLIST *l = &stTop[TM_IO];
+    Text(c, c->L, c->R, T(S_PROCS), c->cMain, DT_LEFT); RwHeader(c); c->row++;
+    if (!l->n) Text(c, c->L, c->R, haveBase ? T(S_QUIET) : T(S_MEASURING), c->cDim, DT_LEFT);
+    for (int i = 0; i < l->n && i < TOPN; i++, c->row++) RwRow(c, c->L, &l->e[i], l->e[0].v, 3);
 }
 
 static void PaintNetGraph(PCTX *c) {                    // rx area + tx line, auto-scaled to window max

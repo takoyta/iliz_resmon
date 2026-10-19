@@ -28,7 +28,7 @@ static const GUID SessGuid   = {0x6c1a7f3e, 0x41b2, 0x4d8e, {0x9a, 0x51, 0x2e, 0
 #define THN 4096
 
 // Per-tick tables, filled by the trace thread under cs, swapped out each tick. key 0 = empty slot.
-typedef struct { DWORD key; int disk; LONGLONG bytes; } AGG;       // key = pid + 1
+typedef struct { DWORD key; int disk; LONGLONG rd, wr; } AGG;     // key = pid + 1; bytes read / written
 typedef struct { DWORD key; LONGLONG rx, tx; } NAGG;
 // Double-buffered: the trace thread writes *agg / *nagg; each tick the pointers swap under cs and the
 // drained table is read and cleared outside the lock.
@@ -103,7 +103,7 @@ static void OnDisk(PEVENT_RECORD e) {                    // DiskIo Read/Write
     for (UINT h = Hash(key * 31 + disk) & (AGGN - 1), k = 0; k < AGGN; k++, h = (h + 1) & (AGGN - 1)) {
         AGG *g = &agg[h];
         if (!g->key) { if (nAgg >= AGGN * 3 / 4) break; g->key = key; g->disk = disk; nAgg++; }
-        if (g->key == key && g->disk == disk) { g->bytes += size; break; }
+        if (g->key == key && g->disk == disk) { if (op == OP_SEND) g->rd += size; else g->wr += size; break; }   // 10 Read, 11 Write
     }
     LeaveCriticalSection(&cs);
 }
@@ -223,10 +223,10 @@ static void DiskTick(LONGLONG dt) {                      // per-disk top list fo
         int di = -1;
         for (int i = 0; i < ndisk; i++) if (disks[i].num == snap[a].disk) di = i;
         if (di < 0) continue;
-        LONGLONG v = snap[a].bytes * 1000 / dt;
+        LONGLONG r = snap[a].rd * 1000 / dt, w = snap[a].wr * 1000 / dt, v = r + w;   // sorted by the total
         DTOP *t = dtop[di]; int k = ndtop[di] < DTOPN ? ndtop[di]++ : DTOPN;
         while (k > 0 && t[k - 1].v < v) { if (k < DTOPN) t[k] = t[k - 1]; k--; }
-        if (k < DTOPN) { t[k].pid = snap[a].key - 1; t[k].v = v; }
+        if (k < DTOPN) { t[k].pid = snap[a].key - 1; t[k].v = v; t[k].r = r; t[k].w = w; }
     }
 }
 

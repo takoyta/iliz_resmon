@@ -80,6 +80,8 @@ enum StrId {
     S_LEG_VRAM,
     S_VRAM_PROCS,
     S_CFG_TOPN,
+    S_COL_READ,
+    S_COL_WRITE,
     S_COUNT
 };
 

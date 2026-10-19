@@ -14,7 +14,7 @@ typedef struct {                                         // class 5 (x64 layout)
 #define SPI_READ_BYTES  232                              // ReadTransferCount offset (x64)
 #define SPI_WRITE_BYTES 240                              // WriteTransferCount offset (x64)
 
-typedef struct { DWORD pid; LONGLONG create, t, io; WCHAR name[NAME_LEN]; } PREC;
+typedef struct { DWORD pid; LONGLONG create, t, rd, wr; WCHAR name[NAME_LEN]; } PREC;
 static PREC *pPrev, *pCur; static int nPrev, cap;        // snapshots, cap entries each
 static int *hIdx; static int hMask;                      // pid -> index into pPrev (open addressing, -1 empty)
 static BYTE *pbuf; static ULONG pbufSize;
@@ -33,13 +33,13 @@ static void CopyName(WCHAR *dst, const SPI *s, int max) {  // without ".exe"
     if (n > 4 && !lstrcmpiW(dst + n - 4, L".exe")) dst[n - 4] = 0;
 }
 
-static void TopInsert(int m, const SPI *s, LONGLONG v) {
+static void TopInsert(int m, const SPI *s, LONGLONG v, LONGLONG r = 0, LONGLONG w = 0) {
     if (v <= 0) return;
     TOP *t = top[m]; int k = nTop[m] < TOPN ? nTop[m]++ : TOPN;
     while (k > 0 && t[k - 1].v < v) { if (k < TOPN) t[k] = t[k - 1]; k--; }
     if (k >= TOPN) return;
     CopyName(t[k].name, s, NAME_LEN - 1); t[k].pid = (DWORD)(ULONG_PTR)s->Pid;
-    t[k].v = v;
+    t[k].v = v; t[k].r = r; t[k].w = w;
 }
 
 static inline UINT H(DWORD pid) { return (pid >> 2) * 2654435761u; }
@@ -90,13 +90,14 @@ void SampleProcs() {
             PREC *r = &pCur[nCur++];
             r->pid = (DWORD)(ULONG_PTR)s->Pid; r->create = s->Create.QuadPart;
             r->t = s->User.QuadPart + s->Kernel.QuadPart;
-            r->io = *(LONGLONG*)(p + SPI_READ_BYTES) + *(LONGLONG*)(p + SPI_WRITE_BYTES);
+            r->rd = *(LONGLONG*)(p + SPI_READ_BYTES); r->wr = *(LONGLONG*)(p + SPI_WRITE_BYTES);
             CopyName(r->name, s, NAME_LEN - 1);
             TopInsert(TM_MEM, s, s->PrivWs.QuadPart);    // instantaneous, no baseline
             const PREC *o = haveBase ? FindPrev(r->pid) : 0;
             if (o && o->create == r->create) {
                 if (sysDelta > 0) TopInsert(TM_CPU, s, (r->t - o->t) * 1000 / sysDelta);
-                TopInsert(TM_IO, s, (r->io - o->io) * 1000 / dt);
+                LONGLONG dr = (r->rd - o->rd) * 1000 / dt, dw = (r->wr - o->wr) * 1000 / dt;
+                TopInsert(TM_IO, s, dr + dw, dr, dw);
             }
         }
         if (!s->Next) break;

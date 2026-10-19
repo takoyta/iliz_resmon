@@ -14,7 +14,7 @@ The UI is in English or Russian, picked from the Windows display language (Russi
 
 - **CPU**: a tray icon with one bar per core (cores are grouped when there are more cores than pixels). The popup shows a 5-minute graph (average load and the busiest core) and the top processes (10 by default).
 - **Memory**: used and available memory, cache, commit charge, a 5-minute graph, and the top processes (10 by default) by private working set.
-- **Disks**: one entry per physical drive with its volume letters (`Samsung SSD 980 PRO [C:]`): activity, read and write speed, queue length, free space, and the processes loading each drive.
+- **Disks**: one entry per physical drive with its volume letters (`Samsung SSD 980 PRO [C:]`): activity, read and write speed, queue length, free space, and the processes loading each drive with separate read and write speed columns (sorted by the total).
 - **Network**: download and upload speed, a 5-minute graph, and the top processes (10 by default) by traffic with their current speed and today's totals (reset at midnight).
 - **GPU** (off by default, enable it in the configurator): load from the `GPU Engine` performance counters (busiest engine type, as in Task Manager), plus video memory use (`GPU Adapter Memory` counters against the DXGI memory size, matched by adapter LUID). The scrolling graph icon shows load as columns and video memory as a cyan line; the popup shows `VRAM: used / total (N%)`, a 5-minute graph with both (with a legend), the busiest engine types and the top processes by video memory. Memory follows the adapter that carries the load. Integrated GPUs (less than 512 MB dedicated) show shared system memory instead. No admin rights needed.
 - Processes that drop out of a top list stay visible in grey for 5 seconds, so you have time to see what it was.
@@ -24,7 +24,7 @@ The UI is in English or Russian, picked from the Windows display language (Russi
 
 ## Administrator rights
 
-Per-process disk and network statistics come from kernel tracing (ETW), which needs administrator rights. Without them everything else still works: the network popup shows adapter totals and a note that per-process traffic needs administrator rights (the same note is in the tooltip and the tray menu), and the disk popup lists processes by total I/O instead. The "Restart as administrator" menu item starts an elevated copy, which closes the non-elevated instance by itself.
+Per-process disk and network statistics come from kernel tracing (ETW), which needs administrator rights. Without them everything else still works: the network popup shows adapter totals and a note that per-process traffic needs administrator rights (the same note is in the tooltip and the tray menu), and the disk popup lists processes by total I/O (all devices, read and write columns) instead. The "Restart as administrator" menu item starts an elevated copy, which closes the non-elevated instance by itself.
 
 Some anti-cheat systems (for example, Easy Anti-Cheat) block kernel tracing while a game is running. The program retries every 15 seconds and recovers on its own after you exit the game.
 

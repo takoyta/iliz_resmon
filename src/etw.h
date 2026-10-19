@@ -2,7 +2,7 @@
 #include "common.h"
 #define DTOPN_MAX 6
 #define DTOPN ((topN * 2 + 2) / 5)           // per-disk rows: 4 at the default 10 (1..6)
-typedef struct { DWORD pid; LONGLONG v; } DTOP;          // per-disk top, bytes/s
+typedef struct { DWORD pid; LONGLONG v, r, w; } DTOP;    // per-disk top, bytes/s: v = read r + write w
 typedef struct {                           // net process row: totals since start + current rates
     DWORD pid; WCHAR name[NAME_LEN];
     LONGLONG rx, tx;                       // bytes/s this tick (0 if idle)
