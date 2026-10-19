@@ -21,7 +21,7 @@ void AppSample() {
     SampleMem(); SampleDisks(); SampleNet(); SampleGpu();
     EtwTick();                             // per-disk / per-process net from the trace
     SampleProcs();                         // after EtwTick: NameOf() for trace pids uses this snapshot
-    PtFinish(&ptNet);                      // after SampleProcs: names + top list of the daily net totals
+    PtFinish(&ptNet); PtFinish(&ptDisk); PtFinish(&ptIo);   // after SampleProcs: names + top lists of the daily totals
 }
 
 void AppTick() {

@@ -3,6 +3,7 @@
 #include "common.h"
 #include "lang.h"
 #include "procs.h"
+#include "proctot.h"
 #include "cpu.h"
 
 static_assert(sizeof(void*) == 8, "SYSTEM_PROCESS_INFORMATION offsets below are for x64 only");
@@ -33,13 +34,13 @@ static void CopyName(WCHAR *dst, const SPI *s, int max) {  // without ".exe"
     if (n > 4 && !lstrcmpiW(dst + n - 4, L".exe")) dst[n - 4] = 0;
 }
 
-static void TopInsert(int m, const SPI *s, LONGLONG v, LONGLONG r = 0, LONGLONG w = 0) {
+static void TopInsert(int m, const SPI *s, LONGLONG v) {
     if (v <= 0) return;
     TOP *t = top[m]; int k = nTop[m] < TOPN ? nTop[m]++ : TOPN;
     while (k > 0 && t[k - 1].v < v) { if (k < TOPN) t[k] = t[k - 1]; k--; }
     if (k >= TOPN) return;
     CopyName(t[k].name, s, NAME_LEN - 1); t[k].pid = (DWORD)(ULONG_PTR)s->Pid;
-    t[k].v = v; t[k].r = r; t[k].w = w;
+    t[k].v = v;
 }
 
 static inline UINT H(DWORD pid) { return (pid >> 2) * 2654435761u; }
@@ -82,7 +83,7 @@ void SampleProcs() {
         PREC *b = (PREC*)Grow(pCur, (n + 64) * sizeof(PREC));  if (!b) return; pCur = b;
         cap = n + 64;
     }
-    int nCur = 0; LONGLONG dt = TickDt();
+    int nCur = 0;
     for (int m = 0; m < TM_N; m++) nTop[m] = 0;
     for (BYTE *p = pbuf;; p += ((SPI*)p)->Next) {
         SPI *s = (SPI*)p;
@@ -96,8 +97,7 @@ void SampleProcs() {
             const PREC *o = haveBase ? FindPrev(r->pid) : 0;
             if (o && o->create == r->create) {
                 if (sysDelta > 0) TopInsert(TM_CPU, s, (r->t - o->t) * 1000 / sysDelta);
-                LONGLONG dr = (r->rd - o->rd) * 1000 / dt, dw = (r->wr - o->wr) * 1000 / dt;
-                TopInsert(TM_IO, s, dr + dw, dr, dw);
+                PtAdd(&ptIo, r->pid, r->rd - o->rd, r->wr - o->wr);   // daily all-I/O totals (no-admin disk table)
             }
         }
         if (!s->Next) break;

@@ -4,7 +4,6 @@
 #include <evntrace.h>
 #include <evntcons.h>
 #include "etw.h"
-#include "disk.h"
 #include "procs.h"
 #include "proctot.h"
 #include "lang.h"
@@ -28,7 +27,7 @@ static const GUID SessGuid   = {0x6c1a7f3e, 0x41b2, 0x4d8e, {0x9a, 0x51, 0x2e, 0
 #define THN 4096
 
 // Per-tick tables, filled by the trace thread under cs, swapped out each tick. key 0 = empty slot.
-typedef struct { DWORD key; int disk; LONGLONG rd, wr; } AGG;     // key = pid + 1; bytes read / written
+typedef struct { DWORD key; LONGLONG rd, wr; } AGG;     // key = pid + 1; bytes read / written (all disks)
 typedef struct { DWORD key; LONGLONG rx, tx; } NAGG;
 // Double-buffered: the trace thread writes *agg / *nagg; each tick the pointers swap under cs and the
 // drained table is read and cleared outside the lock.
@@ -45,7 +44,6 @@ static ULONGLONG etwRetryAt, etwCheckAt;
 #define ETW_CHECK_MS 10000
 
 int etwOn, etwState, etwTicks; ULONG etwErr, etwLost;
-DTOP dtop[MAXD][DTOPN_MAX]; int ndtop[MAXD];
 
 static inline UINT Hash(DWORD k) { return (k * 2654435761u) >> 8; }
 
@@ -87,15 +85,15 @@ static void OnDisk(PEVENT_RECORD e) {                    // DiskIo Read/Write
     int op = e->EventHeader.EventDescriptor.Opcode;
     if ((op != OP_SEND && op != OP_RECV) || e->UserDataLength < DISK_EV_MIN) return;   // same opcodes: Read/Write
     BYTE *d = (BYTE*)e->UserData;
-    int disk = *(ULONG*)d; LONGLONG size = *(ULONG*)(d + 8); DWORD tid = *(ULONG*)(d + DISK_EV_TID);
+    LONGLONG size = *(ULONG*)(d + 8); DWORD tid = *(ULONG*)(d + DISK_EV_TID);
     DWORD pid = tid ? PidOfThread(tid) : e->EventHeader.ProcessId;
     if (pid == 0xFFFFFFFF) pid = 0;
     DWORD key = pid + 1;
     EnterCriticalSection(&cs);
-    for (UINT h = Hash(key * 31 + disk) & (AGGN - 1), k = 0; k < AGGN; k++, h = (h + 1) & (AGGN - 1)) {
+    for (UINT h = Hash(key) & (AGGN - 1), k = 0; k < AGGN; k++, h = (h + 1) & (AGGN - 1)) {
         AGG *g = &agg[h];
-        if (!g->key) { if (nAgg >= AGGN * 3 / 4) break; g->key = key; g->disk = disk; nAgg++; }
-        if (g->key == key && g->disk == disk) { if (op == OP_SEND) g->rd += size; else g->wr += size; break; }   // 10 Read, 11 Write
+        if (!g->key) { if (nAgg >= AGGN * 3 / 4) break; g->key = key; nAgg++; }
+        if (g->key == key) { if (op == OP_SEND) g->rd += size; else g->wr += size; break; }   // 10 Read, 11 Write
     }
     LeaveCriticalSection(&cs);
 }
@@ -209,17 +207,8 @@ void EtwStart() {
     etwCheckAt = GetTickCount64() + ETW_CHECK_MS;
 }
 
-static void DiskTick(LONGLONG dt) {                      // per-disk top list for the last interval
-    for (int i = 0; i < ndisk; i++) ndtop[i] = 0;
-    for (int a = 0; a < AGGN; a++) if (snap[a].key) {
-        int di = -1;
-        for (int i = 0; i < ndisk; i++) if (disks[i].num == snap[a].disk) di = i;
-        if (di < 0) continue;
-        LONGLONG r = snap[a].rd * 1000 / dt, w = snap[a].wr * 1000 / dt, v = r + w;   // sorted by the total
-        DTOP *t = dtop[di]; int k = ndtop[di] < DTOPN ? ndtop[di]++ : DTOPN;
-        while (k > 0 && t[k - 1].v < v) { if (k < DTOPN) t[k] = t[k - 1]; k--; }
-        if (k < DTOPN) { t[k].pid = snap[a].key - 1; t[k].v = v; t[k].r = r; t[k].w = w; }
-    }
+static void DiskTick() {                                 // fold this tick into the daily per-process disk totals
+    for (int a = 0; a < AGGN; a++) if (snap[a].key) PtAdd(&ptDisk, snap[a].key - 1, snap[a].rd, snap[a].wr);
 }
 
 static void NetTick() {                                  // fold this tick into the daily per-process totals
@@ -232,13 +221,12 @@ void EtwTick() {
         etwCheckAt = now + ETW_CHECK_MS;
         if (!Alive()) { etwErr = 0; Cleanup(ETW_DIED); }
     }
-    if (!etwOn) { for (int i = 0; i < ndisk; i++) ndtop[i] = 0; if (now >= etwRetryAt) EtwStart(); return; }   // net totals kept
+    if (!etwOn) { if (now >= etwRetryAt) EtwStart(); return; }   // daily totals kept
     EnterCriticalSection(&cs);
     AGG *a = agg; agg = snap; snap = a; nAgg = 0;
     NAGG *g = nagg; nagg = nsnap; nsnap = g; nNagg = 0;
     LeaveCriticalSection(&cs);
-    LONGLONG dt = TickDt();
-    DiskTick(dt); NetTick();
+    DiskTick(); NetTick();
     ZeroMemory(snap, sizeof(aggT[0])); ZeroMemory(nsnap, sizeof(naggT[0]));   // ready for the next swap
     etwTicks++;
 }

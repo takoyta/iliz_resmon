@@ -12,7 +12,7 @@ struct PTENT_ {
     WCHAR name[NAME_LEN];                  // last known name (survives process exit)
 };
 
-PTAB ptNet;
+PTAB ptNet, ptDisk, ptIo;
 
 static inline UINT Hash(DWORD k) { return (k * 2654435761u) >> 8; }
 
@@ -21,7 +21,7 @@ static void Alloc(PTAB *t, int cap, int sumSort) {
     t->cap = t->e ? cap : 0; t->sumSort = sumSort;
 }
 
-void PtInit() { Alloc(&ptNet, 1024, 0); }
+void PtInit() { Alloc(&ptNet, 1024, 0); Alloc(&ptDisk, 512, 1); Alloc(&ptIo, 512, 1); }
 
 static LONGLONG Created(DWORD pid) {                     // snapshot first (free), else ask the process
     LONGLONG c = CreateOf(pid); if (c) return c;

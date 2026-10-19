@@ -18,6 +18,8 @@ typedef struct {
     PTROW row[TOPN_MAX]; int nrow;         // top list (PtFinish)
 } PTAB;
 extern PTAB ptNet;                         // ETW TCP/UDP: a = received, b = sent
+extern PTAB ptDisk;                        // ETW disk I/O: a = read, b = written (physical disks only)
+extern PTAB ptIo;                          // process I/O counters: a = read, b = written (all I/O: files, devices, network)
 void PtInit();                             // allocate the tables
 void PtAdd(PTAB *t, DWORD pid, LONGLONG a, LONGLONG b);   // bytes moved this tick by pid
 void PtFinish(PTAB *t);                    // after SampleProcs: names, rates, top TOPN rows

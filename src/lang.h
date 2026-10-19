@@ -44,12 +44,12 @@ enum StrId {
     S_COMMIT,
     S_PROCS,
     S_VOL,
-    S_DPROC_QUIET,
+    S_PROCS_ALLIO,
     S_DISK_LINE,
     S_NO_NIC,
     S_NIC_TOT,
     S_SPEED,
-    S_TOTAL,
+    S_TODAY,
     S_SILENCE,
     S_CFG_TITLE,
     S_CFG_GROUP,
@@ -80,8 +80,8 @@ enum StrId {
     S_LEG_VRAM,
     S_VRAM_PROCS,
     S_CFG_TOPN,
-    S_COL_READ,
-    S_COL_WRITE,
+    S_PFX_READ,
+    S_PFX_WRITE,
     S_COUNT
 };
 

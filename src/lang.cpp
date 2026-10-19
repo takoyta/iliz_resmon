@@ -39,12 +39,12 @@ static const WCHAR *const en[S_COUNT] = {
     L"Committed",
     L"Processes",
     L"%c:  free %s of %s",
-    L"processes: quiet",
+    L"Processes, all I/O",
     L"read %s   write %s   queue %lu",
     L"No active adapters",
     L"since start: received %s, sent %s",
     L"speed",
-    L"total",
+    L"today",
     L"quiet",
     L"iliz resmon: settings",
     L"Tray icons",
@@ -75,8 +75,8 @@ static const WCHAR *const en[S_COUNT] = {
     L"VRAM",
     L"Processes by VRAM",
     L"Process rows in popups:",
-    L"read",
-    L"write",
+    L"R ",
+    L"W ",
 };
 
 static const WCHAR *const ru[S_COUNT] = {
@@ -117,12 +117,12 @@ static const WCHAR *const ru[S_COUNT] = {
     L"Выделено (commit)",
     L"Процессы",
     L"%c:  свободно %s из %s",
-    L"процессы: тишина",
+    L"Процессы: весь I/O",
     L"чтение %s   запись %s   очередь %lu",
     L"Нет активных адаптеров",
     L"с запуска: принято %s, отправлено %s",
     L"скорость",
-    L"всего",
+    L"сегодня",
     L"тишина",
     L"iliz resmon: настройки",
     L"Иконки в трее",
@@ -153,8 +153,8 @@ static const WCHAR *const ru[S_COUNT] = {
     L"видеопамять",
     L"Процессы по видеопамяти",
     L"Строк процессов в окнах:",
-    L"чтение",
-    L"запись",
+    L"Ч ",
+    L"З ",
 };
 
 const WCHAR *T(int id) {

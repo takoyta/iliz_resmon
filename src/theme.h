@@ -5,6 +5,7 @@
 #define C_CPU_PEAK  RGB(215, 255, 160)     // busiest-core line on the CPU graph
 #define C_DSK       RGB(70, 215, 200)
 #define C_DSK_DARK  RGB(30, 110, 105)
+#define C_DSK_TOT   RGB(50, 160, 150)      // disk popup: read today
 #define C_RX        RGB(100, 190, 255)
 #define C_RX_DARK   RGB(40, 80, 150)
 #define C_RX_TOT    RGB(70, 130, 180)

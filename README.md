@@ -14,7 +14,7 @@ The UI is in English or Russian, picked from the Windows display language (Russi
 
 - **CPU**: a tray icon with one bar per core (cores are grouped when there are more cores than pixels). The popup shows a 5-minute graph (average load and the busiest core) and the top processes (10 by default).
 - **Memory**: used and available memory, cache, commit charge, a 5-minute graph, and the top processes (10 by default) by private working set.
-- **Disks**: one entry per physical drive with its volume letters (`Samsung SSD 980 PRO [C:]`): activity, read and write speed, queue length, free space, and the processes loading each drive with separate read and write speed columns (sorted by the total).
+- **Disks**: one entry per physical drive with its volume letters (`Samsung SSD 980 PRO [C:]`): activity, read and write speed, queue length, free space, and a table of the top processes (10 by default) by disk traffic today: current read and write speed and today's read and write totals (reset at midnight, exited processes stay in grey), with a two-part read/write bar.
 - **Network**: download and upload speed, a 5-minute graph, and the top processes (10 by default) by traffic with their current speed and today's totals (reset at midnight).
 - **GPU** (off by default, enable it in the configurator): load from the `GPU Engine` performance counters (busiest engine type, as in Task Manager), plus video memory use (`GPU Adapter Memory` counters against the DXGI memory size, matched by adapter LUID). The scrolling graph icon shows load as columns and video memory as a cyan line; the popup shows `VRAM: used / total (N%)`, a 5-minute graph with both (with a legend), the busiest engine types and the top processes by video memory. Memory follows the adapter that carries the load. Integrated GPUs (less than 512 MB dedicated) show shared system memory instead. No admin rights needed.
 - Processes that drop out of a top list stay visible in grey for 5 seconds, so you have time to see what it was.
@@ -24,7 +24,7 @@ The UI is in English or Russian, picked from the Windows display language (Russi
 
 ## Administrator rights
 
-Per-process disk and network statistics come from kernel tracing (ETW), which needs administrator rights. Without them everything else still works: the network popup shows adapter totals and a note that per-process traffic needs administrator rights (the same note is in the tooltip and the tray menu), and the disk popup lists processes by total I/O (all devices, read and write columns) instead. The "Restart as administrator" menu item starts an elevated copy, which closes the non-elevated instance by itself.
+Per-process disk and network statistics come from kernel tracing (ETW), which needs administrator rights. Without them everything else still works: the network popup shows adapter totals and a note that per-process traffic needs administrator rights (the same note is in the tooltip and the tray menu), and the disk table is fed from the process I/O counters instead and titled "Processes, all I/O" (these also count cached file access, devices and network). The "Restart as administrator" menu item starts an elevated copy, which closes the non-elevated instance by itself.
 
 Some anti-cheat systems (for example, Easy Anti-Cheat) block kernel tracing while a game is running. The program retries every 15 seconds and recovers on its own after you exit the game.
 
@@ -43,7 +43,7 @@ interval_ms=1000
 top_n=10
 ```
 
-A missing file or key means "on" for `cpu`/`mem`/`disk`/`net`, "off" for `gpu`, 1000 ms for `interval_ms` (500, 1000 or 2000) and 10 for `top_n` (3 to 15). `top_n` is the length of the CPU, memory, network and disk-fallback process lists; the per-disk lists get 2/5 of it (4 at 10) and the GPU engine and video-memory lists half (5 at 10). Popup heights follow. `iliz_resmon_config.exe` writes the file and posts the registered window message `iliz_resmon_reload` to the running iliz resmon, which rereads the file, re-adds only the enabled icons and restarts its timer with the new interval (the message is allowed through UIPI, so it works when iliz resmon runs as administrator). The ini is not part of the release zip and is listed in `preserve` in `iliz_updater.json`, so updates keep your settings.
+A missing file or key means "on" for `cpu`/`mem`/`disk`/`net`, "off" for `gpu`, 1000 ms for `interval_ms` (500, 1000 or 2000) and 10 for `top_n` (3 to 15). `top_n` is the length of the CPU, memory, disk and network process lists; the GPU engine and video-memory lists get half of it (5 at 10). Popup heights follow. `iliz_resmon_config.exe` writes the file and posts the registered window message `iliz_resmon_reload` to the running iliz resmon, which rereads the file, re-adds only the enabled icons and restarts its timer with the new interval (the message is allowed through UIPI, so it works when iliz resmon runs as administrator). The ini is not part of the release zip and is listed in `preserve` in `iliz_updater.json`, so updates keep your settings.
 
 ## Updates
 
@@ -72,6 +72,7 @@ You need Visual Studio 2022 Build Tools with the C++ workload. Run `build.bat`: 
 | `etw.cpp` | Kernel tracing: per-process disk and network activity, automatic session recovery |
 | `history.cpp` | 5-minute per-second history (bytes / 16-bit codes) for the graphs |
 | `sticky.cpp` | Rows that dropped out of a top list and stay visible in grey |
+| `proctot.cpp` | Per-process daily totals (network, disk, all I/O): reset at midnight, kept for exited processes |
 | `trayicon.cpp` | Icon drawing and tray handling |
 | `popup.cpp`, `views.cpp`, `draw.cpp`, `theme.h` | Popups: placement, content, drawing primitives, colors |
 | `autostart.cpp` | Elevation check, restart as administrator |
