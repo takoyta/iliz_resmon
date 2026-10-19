@@ -14,10 +14,12 @@ static void Place() {
     MONITORINFO mi = {sizeof(mi)};
     GetMonitorInfoW(MonitorFromRect(&ir, MONITOR_DEFAULTTONEAREST), &mi);
     RECT w = mi.rcWork, m = mi.rcMonitor;
-    SetWindowPos(hPop, 0, w.left, w.top, 1, 1, SWP_NOACTIVATE | SWP_NOZORDER);   // pick up that monitor's DPI
+    if (!IsWindowVisible(hPop))                          // pick up that monitor's DPI (visible: already there, no jump)
+        SetWindowPos(hPop, 0, w.left, w.top, 1, 1, SWP_NOACTIVATE | SWP_NOZORDER);
     dpi = GetDpiForWindow(hPop); if (!dpi) dpi = 96;
     rows = ViewRows(popMode);
     int PW = ViewWidth(popMode), PH = ROWH * rows + SC(10), gap = SC(6);
+    if (PH > w.bottom - w.top - 2 * gap) PH = w.bottom - w.top - 2 * gap;   // very tall (many disks, big top_n): clip the bottom rows
     int px = (ir.left + ir.right) / 2 - PW / 2, py;
     POINT ic = {(ir.left + ir.right) / 2, (ir.top + ir.bottom) / 2};
     if (PtInRect(&w, ic)) {                              // icon sits in the hidden-icons flyout, not on the taskbar
@@ -39,7 +41,7 @@ static void Place() {
     if (py + PH > w.bottom) py = w.bottom - PH - gap;
     if (py < w.top) py = w.top + gap;
     SetWindowPos(hPop, HWND_TOPMOST, px, py, PW, PH, SWP_NOACTIVATE | SWP_SHOWWINDOW);
-    InvalidateRect(hPop, 0, TRUE);
+    InvalidateRect(hPop, 0, FALSE);
 }
 
 void ShowPopup(int id) {
@@ -52,12 +54,14 @@ void HidePopup() { ShowWindow(hPop, SW_HIDE); popMode = 0; }
 
 void PopupTick() {
     if (ViewRows(popMode) != rows) Place();              // trace may come up/down -> resize
-    InvalidateRect(hPop, 0, TRUE);
+    InvalidateRect(hPop, 0, FALSE);
 }
 
 static void Paint(HWND h) {
-    PAINTSTRUCT ps; HDC dc = BeginPaint(h, &ps);
+    PAINTSTRUCT ps; HDC wdc = BeginPaint(h, &ps);
     RECT r; GetClientRect(h, &r);
+    HDC dc = CreateCompatibleDC(wdc);                    // draw off-screen, blit once: no flicker
+    HBITMAP bmp = CreateCompatibleBitmap(wdc, r.right, r.bottom); HGDIOBJ oldBmp = SelectObject(dc, bmp);
     COLORREF cMain, cBar; ViewColors(popMode, &cMain, &cBar);
     PCTX c = {dc, PAD, r.right - PAD, 0, cMain, C_TEXT, C_DIM, CreateSolidBrush(cBar), CreateSolidBrush(C_GHOST_BAR),
               CreateSolidBrush(C_TX_BAR), CreateSolidBrush(C_GHOST_BAR2)};
@@ -66,6 +70,8 @@ static void Paint(HWND h) {
     SelectObject(dc, DrawFont()); SetBkMode(dc, TRANSPARENT);
     ViewPaint(&c, popMode);
     DeleteObject(bg); DeleteObject(c.bar); DeleteObject(c.ghost); DeleteObject(c.bar2); DeleteObject(c.ghost2); DeleteObject(frame);
+    BitBlt(wdc, 0, 0, r.right, r.bottom, dc, 0, 0, SRCCOPY);
+    SelectObject(dc, oldBmp); DeleteObject(bmp); DeleteDC(dc);
     EndPaint(h, &ps);
 }
 
