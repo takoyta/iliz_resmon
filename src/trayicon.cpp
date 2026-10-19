@@ -15,27 +15,36 @@
 
 static Settings cfg;                                     // which icons are enabled etc. (iliz_resmon.ini, LoadSettings)
 
-static NOTIFYICONDATAW nidCpu, nidMem, nidDisk, nidNet, nidGpu;
-static HICON icCpu, icMem, icDisk, icNet, icGpu;
+static int trayDpi;                                      // DPI of the taskbar (TrayDpiChanged)
+static int IconSize() { if (!trayDpi) TrayDpiChanged(); return GetSystemMetricsForDpi(SM_CXSMICON, trayDpi); }
 
-static int IconSize() { return GetSystemMetricsForDpi(SM_CXSMICON, GetDpiForSystem()); }
+void TrayDpiChanged() {                                  // taskbar monitor / scale changed: icons follow on the next draw
+    HWND t = FindWindowW(L"Shell_TrayWnd", 0);
+    UINT d = t ? GetDpiForWindow(t) : 0;
+    trayDpi = d ? d : GetDpiForSystem();
+}
 
-// Canvas helpers: color bitmap + empty mask -> HICON
-typedef struct { int S; HDC sdc, dc; HBITMAP col, mask; HGDIOBJ old; } CANVAS;
+// Canvas helpers: color bitmap + empty mask -> HICON. One memory DC and mask for the life of the process.
+typedef struct { int S; HDC dc; HBITMAP col; HGDIOBJ old; } CANVAS;
+static HDC memDC; static HBITMAP maskBmp; static int maskS;
 static void Begin(CANVAS *c, COLORREF bg) {
-    c->S = IconSize(); c->sdc = GetDC(0); c->dc = CreateCompatibleDC(c->sdc);
-    static BYTE zero[32 * 256];                          // all-zero AND mask = fully opaque (max 256 px, .bss)
-    if (c->S > 256) c->S = 256;
-    c->col = CreateCompatibleBitmap(c->sdc, c->S, c->S); c->mask = CreateBitmap(c->S, c->S, 1, 1, zero);
-    c->old = SelectObject(c->dc, c->col);
+    c->S = IconSize(); if (c->S > 256) c->S = 256;
+    if (!memDC) memDC = CreateCompatibleDC(0);
+    if (maskS != c->S) {                                 // all-zero AND mask = fully opaque (max 256 px, .bss)
+        static BYTE zero[32 * 256];
+        if (maskBmp) DeleteObject(maskBmp);
+        maskBmp = CreateBitmap(c->S, c->S, 1, 1, zero); maskS = c->S;
+    }
+    HDC sdc = GetDC(0); c->col = CreateCompatibleBitmap(sdc, c->S, c->S); ReleaseDC(0, sdc);
+    c->dc = memDC; c->old = SelectObject(c->dc, c->col);
     RECT r = {0, 0, c->S, c->S}; HBRUSH b = CreateSolidBrush(bg);
     FillRect(c->dc, &r, b); DeleteObject(b);
 }
 static HICON End(CANVAS *c) {
     SelectObject(c->dc, c->old);
-    ICONINFO ii = {TRUE, 0, 0, c->mask, c->col};
-    HICON ic = CreateIconIndirect(&ii);
-    DeleteObject(c->col); DeleteObject(c->mask); DeleteDC(c->dc); ReleaseDC(0, c->sdc);
+    ICONINFO ii = {TRUE, 0, 0, maskBmp, c->col};
+    HICON ic = CreateIconIndirect(&ii);                  // copies both bitmaps
+    DeleteObject(c->col);
     return ic;
 }
 
@@ -108,71 +117,81 @@ static HICON DrawGpu() {
     return End(&c);
 }
 
-static BOOL SetIcon(NOTIFYICONDATAW *nid, HICON *slot, HICON ic, DWORD msg) {
-    nid->uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE; nid->hIcon = ic;
-    BOOL ok = Shell_NotifyIconW(msg, nid);
-    if (*slot) DestroyIcon(*slot);
-    *slot = ic;
-    return ok;
+static HICON DrawCpu() { return DrawBars(load, ncpu, C_CPU, C_CPU_DARK); }
+static HICON DrawDisk() {
+    int v[MAXD]; for (int i = 0; i < ndisk; i++) v[i] = disks[i].busy;
+    return DrawBars(v, ndisk, C_DSK, C_DSK_DARK);
 }
 
-static BOOL Update(DWORD msg) {                          // FALSE if any icon is missing in the tray
-    BOOL ok = TRUE;
-    if (cfg.cpu) {
-    wsprintfW(nidCpu.szTip, L"CPU: %d%%", AvgLoad());
-    ok &= SetIcon(&nidCpu, &icCpu, DrawBars(load, ncpu, C_CPU, C_CPU_DARK), msg);
-    }
-    if (cfg.mem) {
-    wsprintfW(nidMem.szTip, T(S_TIP_MEM), mem.load);
-    ok &= SetIcon(&nidMem, &icMem, DrawMem(), msg);
-    }
-    if (cfg.disk && ndisk) {
-        int v[MAXD], mx = 0;
-        for (int i = 0; i < ndisk; i++) { v[i] = disks[i].busy; if (v[i] > mx) mx = v[i]; }
-        wsprintfW(nidDisk.szTip, T(S_TIP_DISK), mx);
-        ok &= SetIcon(&nidDisk, &icDisk, DrawBars(v, ndisk, C_DSK, C_DSK_DARK), msg);
-    }
-    if (cfg.net) {
+static void TipCpu(WCHAR *t) { wsprintfW(t, L"CPU: %d%%", AvgLoad()); }
+static void TipMem(WCHAR *t) { wsprintfW(t, T(S_TIP_MEM), mem.load); }
+static void TipDisk(WCHAR *t) {
+    int mx = 0; for (int i = 0; i < ndisk; i++) if (disks[i].busy > mx) mx = disks[i].busy;
+    wsprintfW(t, T(S_TIP_DISK), mx);
+}
+static void TipNet(WCHAR *t) {
     LONGLONG rx, tx; WCHAR a[24], b[24];
     NetTotals(&rx, &tx); FmtRate(a, rx); FmtRate(b, tx);
-    wsprintfW(nidNet.szTip, T(S_TIP_NET), a, b);
-    if (EtwNote()) lstrcatW(nidNet.szTip, T(EtwNote() == S_NOTE_ADMIN ? S_TIP_ADMIN : S_TIP_BLOCKED));
-    ok &= SetIcon(&nidNet, &icNet, DrawNet(), msg);
-    }
-    if (cfg.gpu) {
-    wsprintfW(nidGpu.szTip, T(S_TIP_GPU), gpuLoad);
-    if (gpuAd >= 0 && gad[gpuAd].total) wsprintfW(nidGpu.szTip + lstrlenW(nidGpu.szTip), T(S_TIP_VRAM), vramPct);
-    ok &= SetIcon(&nidGpu, &icGpu, DrawGpu(), msg);
-    }
+    wsprintfW(t, T(S_TIP_NET), a, b);
+    if (EtwNote()) lstrcatW(t, T(EtwNote() == S_NOTE_ADMIN ? S_TIP_ADMIN : S_TIP_BLOCKED));
+}
+static void TipGpu(WCHAR *t) {
+    wsprintfW(t, T(S_TIP_GPU), gpuLoad);
+    if (gpuAd >= 0 && gad[gpuAd].total) wsprintfW(t + lstrlenW(t), T(S_TIP_VRAM), vramPct);
+}
+
+typedef struct { int id; int *flag; HICON (*draw)(); void (*tip)(WCHAR*); } TDEF;
+static const TDEF defs[] = {                             // tray order on first add
+    {ID_CPU,  &cfg.cpu,  DrawCpu,  TipCpu},
+    {ID_MEM,  &cfg.mem,  DrawMem,  TipMem},
+    {ID_DISK, &cfg.disk, DrawDisk, TipDisk},
+    {ID_NET,  &cfg.net,  DrawNet,  TipNet},
+    {ID_GPU,  &cfg.gpu,  DrawGpu,  TipGpu},
+};
+#define NICONS ((int)(sizeof(defs) / sizeof(defs[0])))
+typedef struct { const TDEF *d; NOTIFYICONDATAW nid; HICON ic; int shown; } TICON;
+static TICON icons[NICONS];                              // runtime state (.bss), d set in InitTray
+
+static BOOL On(const TICON *t) { return *t->d->flag && (t->d->id != ID_DISK || ndisk); }
+
+static BOOL Show(TICON *t, DWORD msg) {                  // draw + NIM_ADD / NIM_MODIFY
+    t->d->tip(t->nid.szTip);
+    HICON ic = t->d->draw();
+    t->nid.uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE; t->nid.hIcon = ic;
+    BOOL ok = Shell_NotifyIconW(msg, &t->nid);
+    if (t->ic) DestroyIcon(t->ic);
+    t->ic = ic;
+    if (msg == NIM_ADD && ok) { Shell_NotifyIconW(NIM_SETVERSION, &t->nid); t->shown = 1; }
     return ok;
 }
 
+static void Hide(TICON *t) { Shell_NotifyIconW(NIM_DELETE, &t->nid); t->shown = 0; }
+
 void InitTray() {
-    NOTIFYICONDATAW *n[5] = {&nidCpu, &nidMem, &nidDisk, &nidNet, &nidGpu};
-    UINT ids[5] = {ID_CPU, ID_MEM, ID_DISK, ID_NET, ID_GPU};
-    for (int i = 0; i < 5; i++) {
-        n[i]->cbSize = sizeof(NOTIFYICONDATAW); n[i]->hWnd = hMain; n[i]->uID = ids[i];
-        n[i]->uCallbackMessage = WM_TRAY; n[i]->uVersion = NOTIFYICON_VERSION_4;
+    for (int i = 0; i < NICONS; i++) {
+        NOTIFYICONDATAW *n = &icons[i].nid; icons[i].d = &defs[i];
+        n->cbSize = sizeof(NOTIFYICONDATAW); n->hWnd = hMain; n->uID = defs[i].id;
+        n->uCallbackMessage = WM_TRAY; n->uVersion = NOTIFYICON_VERSION_4;
     }
 }
 
-void UpdateIcons() { if (cfg.gpu) GpuPush(); if (!Update(NIM_MODIFY)) AddIcons(); }   // tray not ready at logon / Explorer gone
-
-void AddIcons() {
-    Update(NIM_ADD);
-    if (cfg.net) Shell_NotifyIconW(NIM_SETVERSION, &nidNet);
-    if (cfg.cpu) Shell_NotifyIconW(NIM_SETVERSION, &nidCpu);
-    if (cfg.mem) Shell_NotifyIconW(NIM_SETVERSION, &nidMem);
-    if (cfg.disk && ndisk) Shell_NotifyIconW(NIM_SETVERSION, &nidDisk);
-    if (cfg.gpu) Shell_NotifyIconW(NIM_SETVERSION, &nidGpu);
+void UpdateIcons() {                                     // a failed MODIFY: icon missing (tray not ready / Explorer gone)
+    if (cfg.gpu) GpuPush();
+    BOOL ok = TRUE;
+    for (int i = 0; i < NICONS; i++) if (On(&icons[i])) ok &= Show(&icons[i], NIM_MODIFY);
+    if (!ok) AddIcons();
 }
 
-void RemoveIcons() {                                     // deleting an icon that is not there is harmless
-    Shell_NotifyIconW(NIM_DELETE, &nidCpu);
-    Shell_NotifyIconW(NIM_DELETE, &nidNet);
-    Shell_NotifyIconW(NIM_DELETE, &nidMem);
-    Shell_NotifyIconW(NIM_DELETE, &nidDisk);
-    Shell_NotifyIconW(NIM_DELETE, &nidGpu);
+void AddIcons() { for (int i = 0; i < NICONS; i++) if (On(&icons[i])) Show(&icons[i], NIM_ADD); }
+
+void RemoveIcons() { for (int i = 0; i < NICONS; i++) Hide(&icons[i]); }   // deleting an absent icon is harmless
+
+void TraySync() {                                        // add / remove only the icons whose state changed
+    for (int i = 0; i < NICONS; i++) {
+        TICON *t = &icons[i];
+        if (t->shown && !On(t)) Hide(t);
+        else if (!t->shown && On(t)) Show(t, NIM_ADD);
+    }
 }
 
 static void Load() {                                     // never end up with no icon at all: the menu lives on them
@@ -186,8 +205,4 @@ void LoadTraySettings() { Load(); }
 
 int TrayInterval() { return cfg.interval; }
 
-void ReloadTraySettings() {                              // configurator changed the ini: re-add only enabled icons
-    RemoveIcons();
-    Load();
-    AddIcons();
-}
+void ReloadTraySettings() { Load(); TraySync(); }       // configurator changed the ini

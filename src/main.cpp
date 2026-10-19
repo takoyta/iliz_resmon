@@ -100,7 +100,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
             KillTimer(h, TIMER_DISKS);
             int had = ndisk > 0;
             ReinitDisks();
-            if (had != (ndisk > 0)) { if (popMode == ID_DISK) HidePopup(); RemoveIcons(); AddIcons(); }   // disk icon appears / goes
+            if (had != (ndisk > 0)) { if (popMode == ID_DISK) HidePopup(); TraySync(); }   // disk icon appears / goes
         }
         else AppTick();
         return 0;
