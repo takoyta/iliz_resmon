@@ -1,6 +1,7 @@
 /*
  * iliz_updater_client.h - drop-in, header-only helper for apps that ship iliz_updater.exe.
  * MIT License, Copyright (C) 2026 iliz. C and C++, Win32 only, no dependencies.
+ * Copy of iliz_updater/include/iliz_updater_client.h at iliz_updater commit e70fc3c; update it from there, not here.
  *
  * Uses only kernel32/user32 (HeapAlloc, wsprintfW, lstr*): no C runtime calls, so it also works
  * in CRT-free builds (/NODEFAULTLIB, own entry point). Link kernel32.lib and user32.lib.
@@ -62,7 +63,8 @@ static __inline BOOL IlizUpdaterPath(wchar_t *out, DWORD cap)
     return GetFileAttributesW(out) != INVALID_FILE_ATTRIBUTES;
 }
 
-/* Run the updater hidden with args, capture stdout (heap; free with IlizUpdaterFree or HeapFree). */
+/* Run the updater hidden with args, capture stdout (heap; free with IlizUpdaterFree or HeapFree).
+   timeoutMs 0 = no limit; on timeout the updater is terminated and ILIZ_UPD_ERR_TIMEOUT returned. */
 static __inline int IlizUpdaterRun(const wchar_t *args, char **out, DWORD timeoutMs)
 {
     wchar_t exe[MAX_PATH], cmd[MAX_PATH + 512];
@@ -96,32 +98,58 @@ static __inline int IlizUpdaterRun(const wchar_t *args, char **out, DWORD timeou
         return ILIZ_UPD_ERR_NOT_FOUND;
     }
     CloseHandle(wr);
-    for (;;) {
-        char tmp[1024];        /* keep frames under 4 KB: no __chkstk in CRT-free builds */
-        DWORD got = 0, i;
-        if (!ReadFile(rd, tmp, sizeof(tmp), &got, NULL) || !got)
-            break;
-        if (len + got + 1 > cap) {
-            DWORD nc = cap ? cap * 2 : 8192;
-            char *nb;
-            while (nc < len + got + 1)
-                nc *= 2;
-            nb = (char *)(buf ? HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, buf, nc) : IlizUpdaterAlloc_(nc));
-            if (!nb)
+    /* Poll instead of blocking in ReadFile: a grandchild that inherited the pipe, or a hung updater,
+       would otherwise keep us waiting forever. Read what is there; stop once the updater has exited
+       and the pipe is drained; on timeout terminate it. */
+    {
+        DWORD start = GetTickCount(), exited = 0, timedOut = 0;
+        for (;;) {
+            char tmp[1024];        /* keep frames under 4 KB: no __chkstk in CRT-free builds */
+            DWORD avail = 0, got = 0, i;
+            if (!PeekNamedPipe(rd, NULL, 0, NULL, &avail, NULL))
+                break;             /* broken pipe: every writer is gone, all output read */
+            if (!avail) {
+                if (exited)
+                    break;
+                if (WaitForSingleObject(pi.hProcess, 50) == WAIT_OBJECT_0)
+                    exited = 1;    /* one more pass picks up the last bytes */
+                else if (timeoutMs && GetTickCount() - start >= timeoutMs) {
+                    timedOut = 1;
+                    break;
+                }
+                continue;
+            }
+            if (!ReadFile(rd, tmp, avail < sizeof(tmp) ? avail : sizeof(tmp), &got, NULL) || !got)
                 break;
-            buf = nb;
-            cap = nc;
+            if (len + got + 1 > cap) {
+                DWORD nc = cap ? cap * 2 : 8192;
+                char *nb;
+                while (nc < len + got + 1)
+                    nc *= 2;
+                nb = (char *)(buf ? HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, buf, nc) : IlizUpdaterAlloc_(nc));
+                if (!nb)
+                    break;
+                buf = nb;
+                cap = nc;
+            }
+            for (i = 0; i < got; ++i)
+                buf[len + i] = tmp[i];
+            len += got;
+            buf[len] = 0;
         }
-        for (i = 0; i < got; ++i)
-            buf[len + i] = tmp[i];
-        len += got;
-        buf[len] = 0;
+        CloseHandle(rd);
+        if (!timedOut) {           /* pipe closed early: give the process the rest of the timeout */
+            DWORD el = GetTickCount() - start;
+            DWORD left = !timeoutMs ? INFINITE : el < timeoutMs ? timeoutMs - el : 0;
+            timedOut = WaitForSingleObject(pi.hProcess, left) == WAIT_TIMEOUT;
+        }
+        if (timedOut) {
+            TerminateProcess(pi.hProcess, ILIZ_UPD_ERR_TIMEOUT);
+            WaitForSingleObject(pi.hProcess, 1000);
+            code = ILIZ_UPD_ERR_TIMEOUT;
+        } else if (!GetExitCodeProcess(pi.hProcess, &code))
+            code = ILIZ_UPD_ERR_NOT_FOUND;
     }
-    CloseHandle(rd);
-    if (WaitForSingleObject(pi.hProcess, timeoutMs ? timeoutMs : INFINITE) == WAIT_TIMEOUT)
-        code = ILIZ_UPD_ERR_TIMEOUT;
-    else if (!GetExitCodeProcess(pi.hProcess, &code))
-        code = ILIZ_UPD_ERR_NOT_FOUND;
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
     if (out)
