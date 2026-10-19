@@ -13,7 +13,7 @@
 #include "format.h"
 #include "settings.h"
 
-static Settings cfg = {1, 1, 1, 1, 1000, 0, 10};              // which icons are enabled (iliz_resmon.ini)
+static Settings cfg;                                     // which icons are enabled etc. (iliz_resmon.ini, LoadSettings)
 
 static NOTIFYICONDATAW nidCpu, nidMem, nidDisk, nidNet, nidGpu;
 static HICON icCpu, icMem, icDisk, icNet, icGpu;
