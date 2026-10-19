@@ -15,6 +15,8 @@ void SampleNet() {
     PMIB_IF_TABLE2 t;
     if (GetIfTable2(&t) != NO_ERROR) return;
     LONGLONG dt = TickDt();
+    static WORD day; SYSTEMTIME st; GetLocalTime(&st);      // adapter totals cover today, like the process tables
+    BOOL newDay = day && day != st.wDay; day = st.wDay;
     for (int i = 0; i < nnic; i++) nics[i].seen = 0;
     for (ULONG k = 0; k < t->NumEntries; k++) {
         MIB_IF_ROW2 *r = &t->Table[k];
@@ -31,7 +33,7 @@ void SampleNet() {
         NIC *n = &nics[i];
         ULONG64 di = r->InOctets >= n->in0 ? r->InOctets - n->in0 : 0;   // counter reset -> 0
         ULONG64 dout = r->OutOctets >= n->out0 ? r->OutOctets - n->out0 : 0;
-        if (r->InOctets < n->inStart || r->OutOctets < n->outStart) { n->inStart = r->InOctets; n->outStart = r->OutOctets; }
+        if (newDay || r->InOctets < n->inStart || r->OutOctets < n->outStart) { n->inStart = r->InOctets; n->outStart = r->OutOctets; }
         n->rps = (LONGLONG)(di * 1000 / dt); n->tps = (LONGLONG)(dout * 1000 / dt);
         n->in0 = r->InOctets; n->out0 = r->OutOctets; n->seen = 1;
     }
