@@ -148,7 +148,7 @@ static void PaintDisk(PCTX *c) {
     }
     // Daily per-process totals: physical disk I/O from the trace; without it (not elevated / blocked)
     // the process I/O counters, which also count files in cache, devices and network.
-    const TSTYLE st = {T(S_PFX_READ), T(S_PFX_WRITE), C_TX, C_DSK_TOT, C_TX_TOT};
+    static const TSTYLE st = {L"", L"", C_TX, C_DSK_TOT, C_TX_TOT};
     if (etwOn) Table2(c, &ptDisk, T(S_PROCS), etwTicks ? T(S_SILENCE) : T(S_MEASURING), &st);
     else Table2(c, &ptIo, T(S_PROCS_ALLIO), haveBase ? T(S_QUIET) : T(S_MEASURING), &st);
 }

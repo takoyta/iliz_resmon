@@ -75,8 +75,6 @@ static const WCHAR *const en[S_COUNT] = {
     L"VRAM",
     L"Processes by VRAM",
     L"Process rows in popups:",
-    L"R ",
-    L"W ",
 };
 
 static const WCHAR *const ru[S_COUNT] = {
@@ -153,8 +151,6 @@ static const WCHAR *const ru[S_COUNT] = {
     L"видеопамять",
     L"Процессы по видеопамяти",
     L"Строк процессов в окнах:",
-    L"Ч ",
-    L"З ",
 };
 
 const WCHAR *T(int id) {
