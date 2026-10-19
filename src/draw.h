@@ -13,6 +13,7 @@ extern int dpi;                            // DPI of the popup's monitor
 typedef struct { HDC dc; int L, R, row; COLORREF cMain, cText, cDim; HBRUSH bar, ghost, bar2, ghost2; } PCTX;   // bar2/ghost2: second part of two-part bars
 
 HFONT DrawFont();                          // font for current dpi (recreated on change)
+void DrawFontReset();                      // WM_SETTINGCHANGE: the message font may have changed
 int RowY(const PCTX *c);                   // top y of the current row
 void Text(PCTX *c, int l, int r, const WCHAR *s, COLORREF col, UINT al);
 void Bar(PCTX *c, int x0, int w, int inset, HBRUSH br);

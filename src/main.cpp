@@ -13,6 +13,7 @@
 #include "iliz_updater_client.h"
 #include "settings.h"
 #include "disk.h"
+#include "draw.h"
 #include <dbt.h>
 
 enum { IDM_ADMIN = 1, IDM_CONFIG, IDM_UPDATE, IDM_ABOUT, IDM_EXIT };
@@ -104,6 +105,9 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         }
         else AppTick();
         return 0;
+    case WM_DISPLAYCHANGE: case WM_DPICHANGED:           // taskbar scale may have changed: icons redraw at the new size
+        TrayDpiChanged(); return 0;
+    case WM_SETTINGCHANGE: TrayDpiChanged(); DrawFontReset(); break;
     case WM_DEVICECHANGE:                                // volume or device arrival / removal (broadcast to top-level windows)
         if (w == DBT_DEVICEARRIVAL || w == DBT_DEVICEREMOVECOMPLETE || w == DBT_DEVNODES_CHANGED)
             SetTimer(h, TIMER_DISKS, DISKS_DEBOUNCE_MS, 0);   // restarts on every event: one rescan per burst
@@ -120,7 +124,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         EtwStop(); RemoveIcons();
         PostQuitMessage(0); return 0;
     }
-    if (m == wmTaskbar) { AddIcons(); return 0; }        // Explorer restarted
+    if (m == wmTaskbar) { TrayDpiChanged(); AddIcons(); return 0; }   // Explorer restarted (maybe on another monitor / scale)
     if (m == wmReload) {                                 // from iliz_resmon_config.exe
         HidePopup(); ReloadTraySettings();
         SetTimer(h, TIMER_TICK, TrayInterval(), 0);      // same id: replaces (restarts) the tick timer

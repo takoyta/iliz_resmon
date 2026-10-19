@@ -19,6 +19,8 @@ HFONT DrawFont() {
     return hFont;
 }
 
+void DrawFontReset() { fontDpi = 0; }
+
 int RowY(const PCTX *c) { return ROW_TOP + ROWH * c->row; }
 
 void Text(PCTX *c, int l, int r, const WCHAR *s, COLORREF col, UINT al) {
