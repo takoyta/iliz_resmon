@@ -164,10 +164,11 @@ static BOOL Alive() {                                    // trace thread running
 // left by a killed instance makes StartTrace fail with a name collision.
 static void StopOrphans() {
     enum { N = 64, PSZ = sizeof(EVENT_TRACE_PROPERTIES) + 2 * 256 * sizeof(WCHAR) };
-    static BYTE buf[N][PSZ]; EVENT_TRACE_PROPERTIES *pp[N];
-    ZeroMemory(buf, sizeof(buf));
+    BYTE *buf = (BYTE*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, N * PSZ);   // ~73 KB, only for this call
+    if (!buf) return;
+    EVENT_TRACE_PROPERTIES *pp[N];
     for (int i = 0; i < N; i++) {
-        pp[i] = (EVENT_TRACE_PROPERTIES*)buf[i];
+        pp[i] = (EVENT_TRACE_PROPERTIES*)(buf + i * PSZ);
         pp[i]->Wnode.BufferSize = PSZ;
         pp[i]->LoggerNameOffset = sizeof(EVENT_TRACE_PROPERTIES);
         pp[i]->LogFileNameOffset = sizeof(EVENT_TRACE_PROPERTIES) + 256 * sizeof(WCHAR);
@@ -180,6 +181,7 @@ static void StopOrphans() {
         if (InlineIsEqualGUID(pp[i]->Wnode.Guid, SessGuid))
             ControlTraceW(0, name, Props(), EVENT_TRACE_CONTROL_STOP);
     }
+    HeapFree(GetProcessHeap(), 0, buf);
 }
 
 void EtwStart() {
@@ -221,7 +223,7 @@ void EtwTick() {
         etwCheckAt = now + ETW_CHECK_MS;
         if (!Alive()) { etwErr = 0; Cleanup(ETW_DIED); }
     }
-    if (!etwOn) { if (now >= etwRetryAt) EtwStart(); return; }   // daily totals kept
+    if (!etwOn) { if (elevated && now >= etwRetryAt) EtwStart(); return; }   // not elevated: one try at startup only; daily totals kept
     EnterCriticalSection(&cs);
     AGG *a = agg; agg = snap; snap = a; nAgg = 0;
     NAGG *g = nagg; nagg = nsnap; nsnap = g; nNagg = 0;
