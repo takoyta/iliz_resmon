@@ -45,7 +45,7 @@ static void PaintTop(PCTX *c, const STLIST *l, int fmt) {
     for (int i = 0; i < l->n && i < TOPN; i++, c->row++) {   // n may exceed TOPN until the tick after a reload
         const STICKY *e = &l->e[i];
         COLORREF ct = ListRow(c, c->L, c->R - COL_VAL, e->name, e->v, full, 3, e->live);
-        if (fmt == F_PCT10) wsprintfW(s, L"%d.%d%%", (int)(e->v / 10), (int)(e->v % 10));
+        if (fmt == F_PCT10) wsprintfW(s, L"%d%s%d%%", (int)(e->v / 10), T(S_DEC), (int)(e->v % 10));
         else FmtBytes(s, e->v);
         Text(c, c->L, c->R - SC(4), s, ct, DT_RIGHT);
     }
