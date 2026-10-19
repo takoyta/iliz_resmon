@@ -129,7 +129,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         HidePopup(); ReloadTraySettings();
         SetTimer(h, TIMER_TICK, TrayInterval(), 0);      // same id: replaces (restarts) the tick timer
         return 0;
-    }   // from iliz_resmon_config.exe
+    }
     if (m == wmQuit) { DestroyWindow(h); return 0; }      // elevated instance takes over
     return DefWindowProcW(h, m, w, l);
 }

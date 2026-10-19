@@ -14,11 +14,10 @@
 #include "format.h"
 
 #define COL_VAL SC(70)                     // value column of process rows
-enum { F_PCT10, F_BYTES, F_RATE };         // value formats
+enum { F_PCT10, F_BYTES };                 // value formats
 
 static int g1[HISTN], g2[HISTN];           // graph scratch
-static int Last() { return HistLen(); }   // popup graphs: last HISTN seconds
-static int Pct(int m, int *o) { int n = Last(), b = HistLen() - n; for (int i = 0; i < n; i++) o[i] = HistPct(m, b + i) * 10; return n; }
+static int Pct(int m, int *o) { int n = HistLen(); for (int i = 0; i < n; i++) o[i] = HistPct(m, i) * 10; return n; }   // whole history (HISTN s)
 
 int ViewWidth(int mode) { return mode == ID_GPU ? SC(320) : mode == ID_NET ? SC(520) : mode == ID_DISK ? SC(520) : mode == ID_MEM ? SC(300) : SC(240); }
 
@@ -47,8 +46,7 @@ static void PaintTop(PCTX *c, const STLIST *l, int fmt) {
         const STICKY *e = &l->e[i];
         COLORREF ct = ListRow(c, c->L, c->R - COL_VAL, e->name, e->v, full, 3, e->live);
         if (fmt == F_PCT10) wsprintfW(s, L"%d.%d%%", (int)(e->v / 10), (int)(e->v % 10));
-        else if (fmt == F_BYTES) FmtBytes(s, e->v);
-        else FmtRate(s, e->v);
+        else FmtBytes(s, e->v);
         Text(c, c->L, c->R - SC(4), s, ct, DT_RIGHT);
     }
 }
@@ -154,9 +152,9 @@ static void PaintDisk(PCTX *c) {
 }
 
 static void PaintNetGraph(PCTX *c) {                    // rx area + tx line, auto-scaled to window max
-    int n = Last(), b = HistLen() - n; ULONG mx = 1024;
-    for (int i = 0; i < n; i++) { ULONG x = HistNet(H_RX, b + i), y = HistNet(H_TX, b + i); if (x > mx) mx = x; if (y > mx) mx = y; }
-    for (int i = 0; i < n; i++) { g1[i] = (int)((ULONGLONG)HistNet(H_RX, b + i) * 1000 / mx); g2[i] = (int)((ULONGLONG)HistNet(H_TX, b + i) * 1000 / mx); }
+    int n = HistLen(); ULONG mx = 1024;
+    for (int i = 0; i < n; i++) { ULONG x = HistNet(H_RX, i), y = HistNet(H_TX, i); if (x > mx) mx = x; if (y > mx) mx = y; }
+    for (int i = 0; i < n; i++) { g1[i] = (int)((ULONGLONG)HistNet(H_RX, i) * 1000 / mx); g2[i] = (int)((ULONGLONG)HistNet(H_TX, i) * 1000 / mx); }
     WCHAR s[24]; FmtRate(s, mx);
     PaintGraph(c, g1, g2, n, C_TX, 1, s);
 }
@@ -200,9 +198,7 @@ static void PaintGpu(PCTX *c) {                         // load, VRAM, graph (lo
     if (!gpuOk || !ngeng) { Text(c, c->L, c->R, gpuOk ? T(S_MEASURING) : T(S_GPU_NONE), c->cDim, DT_LEFT); return; }
     int idx[MAXG], n = 0;
     for (int i = 0; i < ngeng; i++) {                    // sort by load desc (stable: first seen wins ties)
-        int k = n++;
-        while (k > 0 && geng[idx[k - 1]].v < geng[i].v) { idx[k] = idx[k - 1]; k--; }
-        idx[k] = i;
+        idx[TopPush(idx, &n, MAXG, [&](int j) { return geng[j].v < geng[i].v; })] = i;
     }
     for (int r = 0; r < n && r < GPU_ROWS; r++, c->row++) {
         const GENG *e = &geng[idx[r]];

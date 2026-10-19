@@ -104,9 +104,8 @@ void PtFinish(PTAB *t) {
         BOOL now = e->last == tickNow;
         if (now) { const WCHAR *nm = NameOf(e->key - 1); if (nm[0] != '?') lstrcpynW(e->name, nm, NAME_LEN); }
         if (!e->ta && !e->tb) continue;
-        int k = n < TOPN ? n++ : TOPN;
-        while (k > 0 && Before(t, &t->row[k - 1], e)) { if (k < TOPN) t->row[k] = t->row[k - 1]; k--; }
-        if (k >= TOPN) continue;
+        int k = TopPush(t->row, &n, TOPN, [&](const PTROW &r) { return Before(t, &r, e); });
+        if (k < 0) continue;
         PTROW *r = &t->row[k];
         r->pid = e->key - 1; r->ta = e->ta; r->tb = e->tb;
         r->ra = now ? e->ka * 1000 / dt : 0; r->rb = now ? e->kb * 1000 / dt : 0;

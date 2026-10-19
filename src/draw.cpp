@@ -83,15 +83,6 @@ void PaintGraph(PCTX *c, const int *fill, const int *l2, int n, COLORREF c2, int
     c->row += GRAPH_ROWS;
 }
 
-COLORREF ListRow(PCTX *c, int x0, int nameR, const WCHAR *name, LONGLONG v, LONGLONG full, int inset, int live) {
-    int W = c->R - x0;
-    int bw = (int)(v * W / (full ? full : 1)); if (bw < 1) bw = 1; if (bw > W) bw = W;
-    Bar(c, x0, bw, inset, live ? c->bar : c->ghost);
-    COLORREF ct = live ? c->cText : C_GHOST;
-    Text(c, x0 + SC(4), nameR, name, ct, DT_LEFT);
-    return ct;
-}
-
 COLORREF ListRow2(PCTX *c, int x0, int nameR, const WCHAR *name, LONGLONG v1, LONGLONG v2, LONGLONG full, int inset, int live) {
     int W = c->R - x0;
     if (v1 < 0) v1 = 0;

@@ -20,7 +20,9 @@ void Bar(PCTX *c, int x0, int w, int inset, HBRUSH br);
 void RxTx(PCTX *c, LONGLONG rx, LONGLONG tx, COLORREF cRx, COLORREF cTx);   // "↓ rx  ↑ tx" right-aligned
 // Graph over GRAPH_ROWS rows. Series 0..1000, n samples, newest right; l2 drawn on top if l2Top.
 void PaintGraph(PCTX *c, const int *fill, const int *l2, int n, COLORREF c2, int l2Top, const WCHAR *topLabel);
-// Process row: bar (v relative to full) from x0 + name up to nameR. Returns the text color (ghost-aware).
-COLORREF ListRow(PCTX *c, int x0, int nameR, const WCHAR *name, LONGLONG v, LONGLONG full, int inset, int live);
-// Same with a two-part bar: length (v1 + v2) / full, first part v1 in bar color, then v2 in bar2 (read|write, rx|tx).
+// Process row: two-part bar, length (v1 + v2) / full, first part v1 in bar color, then v2 in bar2 (read|write, rx|tx),
+// from x0 + name up to nameR. Returns the text color (ghost-aware).
 COLORREF ListRow2(PCTX *c, int x0, int nameR, const WCHAR *name, LONGLONG v1, LONGLONG v2, LONGLONG full, int inset, int live);
+inline COLORREF ListRow(PCTX *c, int x0, int nameR, const WCHAR *name, LONGLONG v, LONGLONG full, int inset, int live) {
+    return ListRow2(c, x0, nameR, name, v, 0, full, inset, live);   // one-part bar
+}

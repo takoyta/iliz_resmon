@@ -36,9 +36,8 @@ static void CopyName(WCHAR *dst, const SPI *s, int max) {  // without ".exe"
 
 static void TopInsert(int m, const SPI *s, LONGLONG v) {
     if (v <= 0) return;
-    TOP *t = top[m]; int k = nTop[m] < TOPN ? nTop[m]++ : TOPN;
-    while (k > 0 && t[k - 1].v < v) { if (k < TOPN) t[k] = t[k - 1]; k--; }
-    if (k >= TOPN) return;
+    TOP *t = top[m]; int k = TopPush(t, &nTop[m], TOPN, [&](const TOP &x) { return x.v < v; });
+    if (k < 0) return;
     CopyName(t[k].name, s, NAME_LEN - 1); t[k].pid = (DWORD)(ULONG_PTR)s->Pid;
     t[k].v = v;
 }
