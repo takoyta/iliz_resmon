@@ -7,6 +7,7 @@
 #include "net.h"
 #include "gpu.h"
 #include "etw.h"
+#include "proctot.h"
 #include "procs.h"
 #include "sticky.h"
 #include "history.h"
@@ -161,20 +162,29 @@ static void PaintNetGraph(PCTX *c) {                    // rx area + tx line, au
     PaintGraph(c, g1, g2, n, C_TX, 1, s);
 }
 
-// Net process columns, right to left: Σ↑ | Σ↓ | ↑ rate | ↓ rate; name takes the rest.
-static void NetCols(PCTX *c, int *x) {                   // x[0..4]: left edges of ↓rate, ↑rate, Σ↓, Σ↑, right end
+// Two-counter process table (network rx/tx, disk read/write): name + two-part bar | rate a | rate b | today a | today b.
+typedef struct { const WCHAR *pa, *pb; COLORREF cB, cTa, cTb; } TSTYLE;   // cell prefixes, colours of b / totals
+static void Table2Cols(PCTX *c, int *x) {               // x[0..4]: left edges of rate a, rate b, Σa, Σb, right end
     int R = c->R - SC(4), w = SC(85);
     x[4] = R; x[3] = R - w; x[2] = R - 2 * w; x[1] = R - 3 * w - SC(10); x[0] = R - 4 * w - SC(10);
 }
 
-static void NetRow(PCTX *c, const NTOP *e, LONGLONG full) {   // bar = total rx + tx (received | sent) relative to the largest row
-    int x[5]; NetCols(c, x); WCHAR a[24], s[32];
-    COLORREF ct = ListRow2(c, c->L, x[0] - SC(6), e->name, (LONGLONG)e->totRx, (LONGLONG)e->totTx, full, 3, e->live);
-    FmtRate(a, e->rx);    wsprintfW(s, L"↓ %s", a); Text(c, x[0], x[1] - SC(6), s, ct, DT_RIGHT);
-    FmtRate(a, e->tx);    wsprintfW(s, L"↑ %s", a); Text(c, x[1], x[2] - SC(10), s, e->live ? C_TX : C_GHOST, DT_RIGHT);
-    FmtBytes(a, e->totRx); wsprintfW(s, L"↓ %s", a); Text(c, x[2], x[3] - SC(6), s, e->live ? C_RX_TOT : C_GHOST, DT_RIGHT);
-    FmtBytes(a, e->totTx); wsprintfW(s, L"↑ %s", a); Text(c, x[3], x[4], s, e->live ? C_TX_TOT : C_GHOST, DT_RIGHT);
-    c->row++;
+static void Table2(PCTX *c, const PTAB *t, const WCHAR *title, const WCHAR *empty, const TSTYLE *st) {
+    int x[5]; Table2Cols(c, x); WCHAR a[24], s[32];
+    Text(c, c->L, x[0], title, c->cMain, DT_LEFT);
+    Text(c, x[0], x[2] - SC(10), T(S_SPEED), c->cDim, DT_CENTER);
+    Text(c, x[2], x[4], T(S_TOTAL), c->cDim, DT_CENTER); c->row++;
+    if (!t->nrow) Text(c, c->L + SC(8), c->R, empty, c->cDim, DT_LEFT);
+    LONGLONG full = 1;                                   // the bar shows a + b relative to the largest row
+    for (int i = 0; i < t->nrow; i++) if ((LONGLONG)(t->row[i].ta + t->row[i].tb) > full) full = (LONGLONG)(t->row[i].ta + t->row[i].tb);
+    for (int i = 0; i < t->nrow; i++, c->row++) {
+        const PTROW *e = &t->row[i]; int lv = e->live;
+        COLORREF ct = ListRow2(c, c->L, x[0] - SC(6), e->name, (LONGLONG)e->ta, (LONGLONG)e->tb, full, 3, lv);
+        FmtRate(a, e->ra);  wsprintfW(s, L"%s%s", st->pa, a); Text(c, x[0], x[1] - SC(6), s, ct, DT_RIGHT);
+        FmtRate(a, e->rb);  wsprintfW(s, L"%s%s", st->pb, a); Text(c, x[1], x[2] - SC(10), s, lv ? st->cB : C_GHOST, DT_RIGHT);
+        FmtBytes(a, e->ta); wsprintfW(s, L"%s%s", st->pa, a); Text(c, x[2], x[3] - SC(6), s, lv ? st->cTa : C_GHOST, DT_RIGHT);
+        FmtBytes(a, e->tb); wsprintfW(s, L"%s%s", st->pb, a); Text(c, x[3], x[4], s, lv ? st->cTb : C_GHOST, DT_RIGHT);
+    }
 }
 
 static void PaintNet(PCTX *c) {
@@ -193,14 +203,8 @@ static void PaintNet(PCTX *c) {
         Text(c, c->L, c->R, T(EtwNote()), c->cDim, DT_LEFT); c->row++;
         return;
     }
-    int x[5]; NetCols(c, x);
-    Text(c, c->L, x[0], T(S_PROCS), c->cMain, DT_LEFT);
-    Text(c, x[0], x[2] - SC(10), T(S_SPEED), c->cDim, DT_CENTER);
-    Text(c, x[2], x[4], T(S_TOTAL), c->cDim, DT_CENTER); c->row++;
-    if (!nNtop) Text(c, c->L + SC(8), c->R, etwTicks ? T(S_SILENCE) : T(S_MEASURING), c->cDim, DT_LEFT);
-    LONGLONG full = 1;                                   // list is sorted by rx; the bar shows rx + tx
-    for (int i = 0; i < nNtop; i++) if ((LONGLONG)(ntop[i].totRx + ntop[i].totTx) > full) full = (LONGLONG)(ntop[i].totRx + ntop[i].totTx);
-    for (int i = 0; i < nNtop; i++) NetRow(c, &ntop[i], full);
+    static const TSTYLE st = {L"↓ ", L"↑ ", C_TX, C_RX_TOT, C_TX_TOT};
+    Table2(c, &ptNet, T(S_PROCS), etwTicks ? T(S_SILENCE) : T(S_MEASURING), &st);
 }
 
 static void PaintGpu(PCTX *c) {                         // load, VRAM, graph (load + VRAM line), engine types, VRAM processes

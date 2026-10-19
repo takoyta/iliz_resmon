@@ -6,6 +6,7 @@
 #include "etw.h"
 #include "disk.h"
 #include "procs.h"
+#include "proctot.h"
 #include "lang.h"
 #include "autostart.h"
 
@@ -24,7 +25,6 @@ static const GUID SessGuid   = {0x6c1a7f3e, 0x41b2, 0x4d8e, {0x9a, 0x51, 0x2e, 0
 #define DISK_EV_TID 48
 #define AGGN 1024                                        // per-tick hash tables (power of 2)
 #define NAGGN 512
-#define CUMN 2048                                        // cumulative per-process net totals
 #define THN 4096
 
 // Per-tick tables, filled by the trace thread under cs, swapped out each tick. key 0 = empty slot.
@@ -34,13 +34,6 @@ typedef struct { DWORD key; LONGLONG rx, tx; } NAGG;
 // drained table is read and cleared outside the lock.
 static AGG aggT[2][AGGN], *agg = aggT[0], *snap = aggT[1]; static int nAgg;
 static NAGG naggT[2][NAGGN], *nagg = naggT[0], *nsnap = naggT[1]; static int nNagg;
-typedef struct {                                         // main thread only
-    DWORD key, last;                                     // last = tickSeq of last traffic
-    LONGLONG create; ULONGLONG rx, tx; LONGLONG rps, tps;
-    WCHAR name[NAME_LEN];                                // last known (survives process exit)
-} CUM;
-static DWORD tickSeq;                                    // EtwTick counter (~seconds)
-static CUM cum[CUMN]; static int nCum;
 static CRITICAL_SECTION cs;
 static DWORD thTid[THN], thPid[THN], thAt[THN];          // thread -> process cache + lookup time in s (trace thread only)
 #define TH_TTL 30                                        // thread ids get reused: re-check after 30 s
@@ -53,12 +46,11 @@ static ULONGLONG etwRetryAt, etwCheckAt;
 
 int etwOn, etwState, etwTicks; ULONG etwErr, etwLost;
 DTOP dtop[MAXD][DTOPN_MAX]; int ndtop[MAXD];
-NTOP ntop[TOPN_MAX]; int nNtop;
 
 static inline UINT Hash(DWORD k) { return (k * 2654435761u) >> 8; }
 
 static int elevated;
-void EtwInit() { InitializeCriticalSection(&cs); elevated = IsElevated(); }
+void EtwInit() { InitializeCriticalSection(&cs); elevated = IsElevated(); PtInit(); }
 
 int EtwNote() { return etwOn ? 0 : elevated ? S_NOTE_BLOCKED : S_NOTE_ADMIN; }
 
@@ -230,95 +222,8 @@ static void DiskTick(LONGLONG dt) {                      // per-disk top list fo
     }
 }
 
-static LONGLONG CreateTime(DWORD pid) {                  // 0 if unknown (system / access denied / dead)
-    LONGLONG c = 0; FILETIME ct, x1, x2, x3;
-    HANDLE p = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
-    if (p) { if (GetProcessTimes(p, &ct, &x1, &x2, &x3)) c = ((LONGLONG)ct.dwHighDateTime << 32) | ct.dwLowDateTime; CloseHandle(p); }
-    return c;
-}
-
-static CUM *CumFind(DWORD key) {                         // open addressing; returns slot (maybe empty)
-    UINT h = Hash(key) & (CUMN - 1);
-    while (cum[h].key && cum[h].key != key) h = (h + 1) & (CUMN - 1);
-    return &cum[h];
-}
-
-static void CumDel(int i) {                              // linear-probing delete with backward shift
-    for (int j = i;;) {
-        j = (j + 1) & (CUMN - 1);
-        if (!cum[j].key) break;
-        int h = Hash(cum[j].key) & (CUMN - 1);
-        if (i <= j ? (i < h && h <= j) : (i < h || h <= j)) continue;   // home slot in (i, j]: stays
-        cum[i] = cum[j]; i = j;
-    }
-    cum[i].key = 0; nCum--;
-}
-
-static void CumEvict() {                                 // drop the oldest-active quarter, dead/reused first
-    static WORD idx[CUMN]; int n = 0;
-    for (int i = 0; i < CUMN; i++) if (cum[i].key) {
-        if (CreateTime(cum[i].key - 1) != cum[i].create) cum[i].last = 0;
-        int k = n++;                                     // insertion sort by last asc
-        while (k > 0 && cum[idx[k - 1]].last > cum[i].last) { idx[k] = idx[k - 1]; k--; }
-        idx[k] = (WORD)i;
-    }
-    int drop = n / 4; if (!drop) return;
-    DWORD T = cum[idx[drop - 1]].last;                   // evict entries with last <= T (at most drop)
-    for (int i = 0; i < CUMN && drop; i++)
-        while (cum[i].key && cum[i].last <= T && drop) { CumDel(i); drop--; }
-}
-
-static CUM *CumAdd(DWORD key, LONGLONG rx, LONGLONG tx) {
-    CUM *c = CumFind(key);
-    if (c->key && tickSeq - c->last > 10) {             // idle ~10 s: check for pid reuse
-        LONGLONG ct = CreateTime(key - 1);
-        if (ct != c->create) { c->rx = c->tx = 0; c->create = ct; c->name[0] = 0; }
-    }
-    if (!c->key) {
-        if (nCum >= CUMN * 3 / 4) { CumEvict(); c = CumFind(key); }
-        c->key = key; c->create = CreateTime(key - 1); c->rx = c->tx = 0; c->name[0] = 0; nCum++;
-    }
-    c->rx += rx; c->tx += tx; c->last = tickSeq;
-    return c;
-}
-
-static void NetTick(LONGLONG dt) {                       // fold this tick into totals, then top 10 by total rx
-    static WORD day;                                     // per-process totals cover the current local day
-    SYSTEMTIME st; GetLocalTime(&st);
-    if (day && day != st.wDay) { ZeroMemory(cum, sizeof(cum)); nCum = 0; }
-    day = st.wDay;
-    for (int i = 0; i < NAGGN; i++) if (nsnap[i].key) {
-        NAGG *g = &nsnap[i];
-        CUM *c = CumAdd(g->key, g->rx, g->tx);
-        c->rps = g->rx * 1000 / dt; c->tps = g->tx * 1000 / dt;
-    }
-    nNtop = 0;
-    for (int i = 0; i < CUMN; i++) if (cum[i].key) {
-        CUM *c = &cum[i];
-        if (c->last != tickSeq) c->rps = c->tps = 0;     // idle this tick
-        if (!c->rx && !c->tx) continue;
-        int k = nNtop < TOPN ? nNtop++ : TOPN;
-        while (k > 0 && (ntop[k - 1].totRx < c->rx || (ntop[k - 1].totRx == c->rx && ntop[k - 1].totTx < c->tx))) {
-            if (k < TOPN) ntop[k] = ntop[k - 1];
-            k--;
-        }
-        if (k >= TOPN) continue;
-        NTOP *t = &ntop[k];
-        t->pid = c->key - 1; t->rx = c->rps; t->tx = c->tps; t->totRx = c->rx; t->totTx = c->tx;
-        t->live = tickSeq - c->last < NET_IDLE_MS / 1000;
-        lstrcpynW(t->name, c->name[0] ? c->name : NameOf(t->pid), NAME_LEN);
-    }
-}
-
-void EtwNames() {                                        // keep names so exited processes stay readable
-    for (int i = 0; i < CUMN; i++) if (cum[i].key && cum[i].last == tickSeq) {
-        const WCHAR *n = NameOf(cum[i].key - 1);
-        if (n[0] != '?') lstrcpynW(cum[i].name, n, NAME_LEN);
-    }
-    for (int i = 0; i < nNtop; i++) if (!ntop[i].name[0] || ntop[i].name[0] == '?') {
-        CUM *c = CumFind(ntop[i].pid + 1);
-        if (c->key && c->name[0]) lstrcpynW(ntop[i].name, c->name, NAME_LEN);
-    }
+static void NetTick() {                                  // fold this tick into the daily per-process totals
+    for (int i = 0; i < NAGGN; i++) if (nsnap[i].key) PtAdd(&ptNet, nsnap[i].key - 1, nsnap[i].rx, nsnap[i].tx);
 }
 
 void EtwTick() {
@@ -333,8 +238,7 @@ void EtwTick() {
     NAGG *g = nagg; nagg = nsnap; nsnap = g; nNagg = 0;
     LeaveCriticalSection(&cs);
     LONGLONG dt = TickDt();
-    tickSeq++;
-    DiskTick(dt); NetTick(dt);
+    DiskTick(dt); NetTick();
     ZeroMemory(snap, sizeof(aggT[0])); ZeroMemory(nsnap, sizeof(naggT[0]));   // ready for the next swap
     etwTicks++;
 }

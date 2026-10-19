@@ -106,6 +106,8 @@ void SampleProcs() {
     IndexPrev();
 }
 
+LONGLONG CreateOf(DWORD pid) { const PREC *r = FindPrev(pid); return r ? r->create : 0; }
+
 const WCHAR *NameOf(DWORD pid) {
     if (pid == 0) return T(S_KERNEL);
     if (pid == 4) return L"System";

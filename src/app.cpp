@@ -8,6 +8,7 @@
 #include "gpu.h"
 #include "etw.h"
 #include "procs.h"
+#include "proctot.h"
 #include "sticky.h"
 #include "history.h"
 #include "trayicon.h"
@@ -20,7 +21,7 @@ void AppSample() {
     SampleMem(); SampleDisks(); SampleNet(); SampleGpu();
     EtwTick();                             // per-disk / per-process net from the trace
     SampleProcs();                         // after EtwTick: NameOf() for trace pids uses this snapshot
-    EtwNames();                            // after SampleProcs: names for the net totals table
+    PtFinish(&ptNet);                      // after SampleProcs: names + top list of the daily net totals
 }
 
 void AppTick() {

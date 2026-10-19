@@ -6,3 +6,4 @@ extern TOP top[TM_N][TOPN_MAX];
 extern int nTop[TM_N], haveBase;
 void SampleProcs();                        // every tick: snapshot + all top lists
 const WCHAR *NameOf(DWORD pid);
+LONGLONG CreateOf(DWORD pid);              // creation time from the last snapshot, 0 if not there
