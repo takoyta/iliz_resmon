@@ -85,9 +85,11 @@ static HICON DrawMem() {                                 // one wide bar: used %
 }
 
 // Scrolling graph, one column per tick, newest right: GPU load columns + video memory line on top.
-static HICON DrawGpu() {
-    static BYTE h[256], vm[256]; static int pos;         // rings of recent load / VRAM % (icon is <= 256 px)
+static BYTE h[256], vm[256]; static int pos;             // rings of recent load / VRAM % (icon is <= 256 px)
+static void GpuPush() {                                  // once per tick (not per draw: re-adds would scroll it)
     h[pos] = (BYTE)gpuLoad; vm[pos] = (BYTE)(gpuAd >= 0 ? vramPct : 255); pos = (pos + 1) & 255;   // 255: no VRAM data
+}
+static HICON DrawGpu() {
     CANVAS c; Begin(&c, C_ICON_BG); int S = c.S;
     int t = S / 12 < 1 ? 1 : S / 12;                     // line thickness: 1 px at 16, 2 px at 24..32
     HBRUSH b = CreateSolidBrush(C_GPU), bv = CreateSolidBrush(C_VRAM);
@@ -154,7 +156,7 @@ void InitTray() {
     }
 }
 
-void UpdateIcons() { if (!Update(NIM_MODIFY)) AddIcons(); }   // tray not ready at logon / Explorer gone
+void UpdateIcons() { if (cfg.gpu) GpuPush(); if (!Update(NIM_MODIFY)) AddIcons(); }   // tray not ready at logon / Explorer gone
 
 void AddIcons() {
     Update(NIM_ADD);

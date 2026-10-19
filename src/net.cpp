@@ -4,7 +4,7 @@
 
 NIC nics[MAXN];
 int nnic, netRx, netTx;
-static LONGLONG netPeak[60]; static int netPeakPos;
+static LONGLONG pkV[60]; static ULONGLONG pkS[60];       // per-second max of rx/tx for the last minute (icon scale)
 
 void NetTotals(LONGLONG *rx, LONGLONG *tx) {
     *rx = *tx = 0;
@@ -38,8 +38,10 @@ void SampleNet() {
     FreeMibTable(t);
     for (int i = 0; i < nnic; ) if (!nics[i].seen) nics[i] = nics[--nnic]; else i++;   // adapter went down
     LONGLONG rx, tx; NetTotals(&rx, &tx);
-    netPeak[netPeakPos++ % 60] = rx > tx ? rx : tx;
+    ULONGLONG sec = tickNow / 1000; int b = (int)(sec % 60);   // time-based: same minute at any interval
+    if (pkS[b] != sec) { pkS[b] = sec; pkV[b] = 0; }
+    if ((rx > tx ? rx : tx) > pkV[b]) pkV[b] = rx > tx ? rx : tx;
     LONGLONG pk = 128 * 1024;                              // at least 128 KB/s
-    for (int i = 0; i < 60; i++) if (netPeak[i] > pk) pk = netPeak[i];
+    for (int i = 0; i < 60; i++) if (sec - pkS[i] < 60 && pkV[i] > pk) pk = pkV[i];
     netRx = (int)(rx * 100 / pk); netTx = (int)(tx * 100 / pk);
 }
