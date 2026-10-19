@@ -25,3 +25,5 @@
 #define C_DIM         RGB(120, 160, 140)
 #define C_GHOST       RGB(110, 120, 115)   // dropped-out rows: text
 #define C_GHOST_BAR   RGB(48, 56, 54)      // dropped-out rows: bar
+#define C_TX_BAR      RGB(135, 75, 20)     // second part of process bars: disk write / network send (dark C_TX: text stays readable)
+#define C_GHOST_BAR2  RGB(72, 64, 54)      // dropped-out rows: second part (warm grey)

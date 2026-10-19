@@ -59,12 +59,13 @@ static void Paint(HWND h) {
     PAINTSTRUCT ps; HDC dc = BeginPaint(h, &ps);
     RECT r; GetClientRect(h, &r);
     COLORREF cMain, cBar; ViewColors(popMode, &cMain, &cBar);
-    PCTX c = {dc, PAD, r.right - PAD, 0, cMain, C_TEXT, C_DIM, CreateSolidBrush(cBar), CreateSolidBrush(C_GHOST_BAR)};
+    PCTX c = {dc, PAD, r.right - PAD, 0, cMain, C_TEXT, C_DIM, CreateSolidBrush(cBar), CreateSolidBrush(C_GHOST_BAR),
+              CreateSolidBrush(C_TX_BAR), CreateSolidBrush(C_GHOST_BAR2)};
     HBRUSH bg = CreateSolidBrush(C_POP_BG), frame = CreateSolidBrush(cMain);
     FillRect(dc, &r, bg); FrameRect(dc, &r, frame);
     SelectObject(dc, DrawFont()); SetBkMode(dc, TRANSPARENT);
     ViewPaint(&c, popMode);
-    DeleteObject(bg); DeleteObject(c.bar); DeleteObject(c.ghost); DeleteObject(frame);
+    DeleteObject(bg); DeleteObject(c.bar); DeleteObject(c.ghost); DeleteObject(c.bar2); DeleteObject(c.ghost2); DeleteObject(frame);
     EndPaint(h, &ps);
 }
 

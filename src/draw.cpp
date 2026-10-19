@@ -89,3 +89,17 @@ COLORREF ListRow(PCTX *c, int x0, int nameR, const WCHAR *name, LONGLONG v, LONG
     Text(c, x0 + SC(4), nameR, name, ct, DT_LEFT);
     return ct;
 }
+
+COLORREF ListRow2(PCTX *c, int x0, int nameR, const WCHAR *name, LONGLONG v1, LONGLONG v2, LONGLONG full, int inset, int live) {
+    int W = c->R - x0;
+    if (v1 < 0) v1 = 0;
+    if (v2 < 0) v2 = 0;
+    LONGLONG v = v1 + v2;
+    int bw = (int)(v * W / (full ? full : 1)); if (bw < 1) bw = 1; if (bw > W) bw = W;
+    int b1 = v ? (int)(v1 * bw / v) : bw;                // split proportionally inside the bar
+    if (b1) Bar(c, x0, b1, inset, live ? c->bar : c->ghost);
+    if (bw - b1) Bar(c, x0 + b1, bw - b1, inset, live ? c->bar2 : c->ghost2);
+    COLORREF ct = live ? c->cText : C_GHOST;
+    Text(c, x0 + SC(4), nameR, name, ct, DT_LEFT);
+    return ct;
+}

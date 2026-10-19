@@ -10,7 +10,7 @@ extern int dpi;                            // DPI of the popup's monitor
 #define ROW_TOP SC(5)                      // top margin of row 0
 #define GRAPH_ROWS 3                       // graph height = 3 rows
 
-typedef struct { HDC dc; int L, R, row; COLORREF cMain, cText, cDim; HBRUSH bar, ghost; } PCTX;
+typedef struct { HDC dc; int L, R, row; COLORREF cMain, cText, cDim; HBRUSH bar, ghost, bar2, ghost2; } PCTX;   // bar2/ghost2: second part of two-part bars
 
 HFONT DrawFont();                          // font for current dpi (recreated on change)
 int RowY(const PCTX *c);                   // top y of the current row
@@ -21,3 +21,5 @@ void RxTx(PCTX *c, LONGLONG rx, LONGLONG tx, COLORREF cRx, COLORREF cTx);   // "
 void PaintGraph(PCTX *c, const int *fill, const int *l2, int n, COLORREF c2, int l2Top, const WCHAR *topLabel);
 // Process row: bar (v relative to full) from x0 + name up to nameR. Returns the text color (ghost-aware).
 COLORREF ListRow(PCTX *c, int x0, int nameR, const WCHAR *name, LONGLONG v, LONGLONG full, int inset, int live);
+// Same with a two-part bar: length (v1 + v2) / full, first part v1 in bar color, then v2 in bar2 (read|write, rx|tx).
+COLORREF ListRow2(PCTX *c, int x0, int nameR, const WCHAR *name, LONGLONG v1, LONGLONG v2, LONGLONG full, int inset, int live);

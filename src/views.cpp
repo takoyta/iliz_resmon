@@ -108,7 +108,7 @@ static void RwHeader(PCTX *c) {                          // column labels on the
 
 static void RwRow(PCTX *c, int x0, const STICKY *e, LONGLONG full, int inset) {
     WCHAR s[32]; int R = c->R - SC(4);
-    COLORREF ct = ListRow(c, x0, R - 2 * COL_RW - SC(4), e->name, e->v, full, inset, e->live);
+    COLORREF ct = ListRow2(c, x0, R - 2 * COL_RW - SC(4), e->name, e->r, e->w, full, inset, e->live);   // ghosts: r/w at peak
     FmtRate(s, e->r); Text(c, R - 2 * COL_RW, R - COL_RW, s, ct, DT_RIGHT);
     FmtRate(s, e->w); Text(c, R - COL_RW, R, s, ct, DT_RIGHT);
 }
@@ -167,9 +167,9 @@ static void NetCols(PCTX *c, int *x) {                   // x[0..4]: left edges 
     x[4] = R; x[3] = R - w; x[2] = R - 2 * w; x[1] = R - 3 * w - SC(10); x[0] = R - 4 * w - SC(10);
 }
 
-static void NetRow(PCTX *c, const NTOP *e, LONGLONG full) {   // bar = total rx relative to the top row
+static void NetRow(PCTX *c, const NTOP *e, LONGLONG full) {   // bar = total rx + tx (received | sent) relative to the largest row
     int x[5]; NetCols(c, x); WCHAR a[24], s[32];
-    COLORREF ct = ListRow(c, c->L, x[0] - SC(6), e->name, (LONGLONG)e->totRx, full, 3, e->live);
+    COLORREF ct = ListRow2(c, c->L, x[0] - SC(6), e->name, (LONGLONG)e->totRx, (LONGLONG)e->totTx, full, 3, e->live);
     FmtRate(a, e->rx);    wsprintfW(s, L"↓ %s", a); Text(c, x[0], x[1] - SC(6), s, ct, DT_RIGHT);
     FmtRate(a, e->tx);    wsprintfW(s, L"↑ %s", a); Text(c, x[1], x[2] - SC(10), s, e->live ? C_TX : C_GHOST, DT_RIGHT);
     FmtBytes(a, e->totRx); wsprintfW(s, L"↓ %s", a); Text(c, x[2], x[3] - SC(6), s, e->live ? C_RX_TOT : C_GHOST, DT_RIGHT);
@@ -198,7 +198,8 @@ static void PaintNet(PCTX *c) {
     Text(c, x[0], x[2] - SC(10), T(S_SPEED), c->cDim, DT_CENTER);
     Text(c, x[2], x[4], T(S_TOTAL), c->cDim, DT_CENTER); c->row++;
     if (!nNtop) Text(c, c->L + SC(8), c->R, etwTicks ? T(S_SILENCE) : T(S_MEASURING), c->cDim, DT_LEFT);
-    LONGLONG full = nNtop ? (LONGLONG)ntop[0].totRx : 1;
+    LONGLONG full = 1;                                   // list is sorted by rx; the bar shows rx + tx
+    for (int i = 0; i < nNtop; i++) if ((LONGLONG)(ntop[i].totRx + ntop[i].totTx) > full) full = (LONGLONG)(ntop[i].totRx + ntop[i].totTx);
     for (int i = 0; i < nNtop; i++) NetRow(c, &ntop[i], full);
 }
 
