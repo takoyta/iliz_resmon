@@ -1,9 +1,12 @@
 // GPU load and video memory via PDH (no admin needed):
 //   \GPU Engine(*)\Utilization Percentage   pid_1234_luid_0x00000000_0x0000D2F1_phys_0_eng_0_engtype_3D
-//     summed per (adapter, engine type); load = busiest type (as Task Manager).
+//     summed over processes per engine (adapter + phys_N + eng_N), max per (adapter, engine type);
+//     load = busiest type (as Task Manager).
 //   \GPU Adapter Memory(*)\Dedicated|Shared Usage   luid_..._phys_0   bytes in use per adapter
-//   \GPU Process Memory(*)\Dedicated|Shared Usage   pid_..._luid_..._phys_0   per process (top list)
-// Memory totals come from DXGI (DedicatedVideoMemory / SharedSystemMemory), read once, matched by LUID.
+//   \GPU Process Memory(*)\Dedicated|Shared Usage   pid_..._luid_..._phys_0   per process (top list; own query,
+//     open only while the GPU popup is shown: thousands of instances)
+// Memory totals come from DXGI (DedicatedVideoMemory / SharedSystemMemory), matched by LUID; reread (and the tables
+// rebuilt) when an unknown LUID shows up, e.g. after a driver reset, at most every 30 s.
 // pdh.dll and dxgi.dll are loaded on demand (the GPU icon is off by default), so they cost nothing while disabled.
 #include "common.h"
 #include "gpu.h"
@@ -19,7 +22,7 @@ typedef PDH_STATUS (WINAPI *GetArr_t)(PDH_HCOUNTER, DWORD, LPDWORD, LPDWORD, PPD
 typedef PDH_STATUS (WINAPI *CloseQ_t)(PDH_HQUERY);
 typedef HRESULT (WINAPI *CreateFactory_t)(REFIID, void**);
 static HMODULE pdh; static OpenQ_t pOpen; static AddC_t pAdd; static Collect_t pCollect; static GetArr_t pGetArr; static CloseQ_t pClose;
-static PDH_HQUERY q;
+static PDH_HQUERY q, qp;                                  // qp: process memory, only while the popup is open
 enum { C_ENG, C_AD_DED, C_AD_SH, C_PR_DED, C_PR_SH, C_N };
 static PDH_HCOUNTER ctr[C_N];
 static const WCHAR *const ctrPath[C_N] = {
@@ -29,14 +32,26 @@ static const WCHAR *const ctrPath[C_N] = {
 };
 static BYTE *buf; static DWORD bufSize;
 #define IGPU_DEDICATED (512ull << 20)                    // less dedicated memory than this: integrated, show shared
+#define REBUILD_MS 30000
+#define MAXE 64                                          // engines (adapter x phys x eng_N)
+typedef struct { WCHAR key[48]; int g; LONGLONG sum; } RENG;   // key "luid_..._phys_0_eng_3", g: index in geng, sum: % x 1000
+static RENG reng[MAXE]; static int nreng;
+static ULONGLONG rebuildAt;
 
 GENG geng[MAXG]; GADAPTER gad[MAXA]; GPROC gproc[VPROC_MAX];
 int ngeng, nGpuAd, ngproc, gpuLoad, gpuOk, gpuAd = -1, vramPct;
 
+static void ProcQuery(BOOL on) {                         // separate query for \GPU Process Memory
+    if (on && !qp && pOpen(0, 0, &qp) == ERROR_SUCCESS) {
+        for (int i = C_PR_DED; i <= C_PR_SH; i++) if (pAdd(qp, ctrPath[i], 0, &ctr[i]) != ERROR_SUCCESS) ctr[i] = 0;
+    } else if (!on && qp) { pClose(qp); qp = 0; ctr[C_PR_DED] = ctr[C_PR_SH] = 0; }
+    if (!on) ngproc = 0;
+}
+
 static void Off() {
-    if (q) pClose(q);
+    if (q) { ProcQuery(FALSE); pClose(q); }
     if (pdh) FreeLibrary(pdh);
-    q = 0; pdh = 0; ngeng = nGpuAd = ngproc = gpuLoad = gpuOk = vramPct = 0; gpuAd = -1;
+    q = 0; pdh = 0; ngeng = nreng = nGpuAd = ngproc = gpuLoad = gpuOk = vramPct = 0; gpuAd = -1;
     if (buf) HeapFree(GetProcessHeap(), 0, buf);
     buf = 0; bufSize = 0;
 }
@@ -48,7 +63,7 @@ static int AdFind(const WCHAR *luid, BOOL add) {        // adapter index by LUID
     return nGpuAd++;
 }
 
-static void ReadDxgi() {                                 // memory sizes per hardware adapter, once per enable
+static void ReadDxgi() {                                 // memory sizes per hardware adapter
     HMODULE dx = LoadLibraryW(L"dxgi.dll"); if (!dx) return;
     CreateFactory_t create = (CreateFactory_t)GetProcAddress(dx, "CreateDXGIFactory1");
     IDXGIFactory1 *f = 0;
@@ -71,6 +86,14 @@ static void ReadDxgi() {                                 // memory sizes per har
     FreeLibrary(dx);
 }
 
+static void Rebuild() {                                  // fresh adapter + engine tables from DXGI
+    nreng = ngeng = nGpuAd = 0;
+    ReadDxgi();
+    gpuAd = -1;                                          // start with the adapter with the most memory
+    for (int i = 0; i < nGpuAd; i++) if (gpuAd < 0 || gad[i].total > gad[gpuAd].total) gpuAd = i;
+    rebuildAt = GetTickCount64() + REBUILD_MS;
+}
+
 void GpuEnable(BOOL on) {
     if (!on) { Off(); return; }
     if (q) return;
@@ -82,10 +105,8 @@ void GpuEnable(BOOL on) {
     pClose = (CloseQ_t)GetProcAddress(pdh, "PdhCloseQuery");
     if (!pOpen || !pAdd || !pCollect || !pGetArr || !pClose || pOpen(0, 0, &q) != ERROR_SUCCESS) { q = 0; Off(); return; }
     if (pAdd(q, ctrPath[C_ENG], 0, &ctr[C_ENG]) != ERROR_SUCCESS) { Off(); return; }
-    for (int i = 1; i < C_N; i++) if (pAdd(q, ctrPath[i], 0, &ctr[i]) != ERROR_SUCCESS) ctr[i] = 0;   // memory: optional
-    ReadDxgi();
-    gpuAd = -1;                                          // start with the adapter with the most memory
-    for (int i = 0; i < nGpuAd; i++) if (gpuAd < 0 || gad[i].total > gad[gpuAd].total) gpuAd = i;
+    for (int i = C_AD_DED; i <= C_AD_SH; i++) if (pAdd(q, ctrPath[i], 0, &ctr[i]) != ERROR_SUCCESS) ctr[i] = 0;   // memory: optional
+    Rebuild();
     pCollect(q);                                         // baseline: rates need two samples
 }
 
@@ -124,27 +145,45 @@ static BOOL Valid(const PDH_FMT_COUNTERVALUE_ITEM_W *it) {
 }
 
 static void Engines() {
-    DWORD n; PPDH_FMT_COUNTERVALUE_ITEM_W it = Arr(C_ENG, PDH_FMT_LONG, &n);
+    DWORD n; PPDH_FMT_COUNTERVALUE_ITEM_W it = Arr(C_ENG, PDH_FMT_LARGE | PDH_FMT_1000, &n);   // x1000: keep < 1 % per process
     gpuOk = it != 0;
+    BOOL stale = FALSE;
+    for (int r = 0; r < nreng; r++) reng[r].sum = 0;
     for (DWORD i = 0; i < n; i++) {
         if (!Valid(&it[i])) continue;
-        WCHAR luid[24], type[24]; Luid(luid, it[i].szName);
-        const WCHAR *t = Find(it[i].szName, L"engtype_");
-        lstrcpynW(type, t && *t ? t : L"?", 24);
-        int g = 0;
-        for (; g < ngeng; g++) if (!lstrcmpiW(geng[g].luid, luid) && !lstrcmpW(geng[g].type, type)) break;
-        if (g == ngeng) {
-            if (ngeng >= MAXG) continue;
-            int ad = AdFind(luid, TRUE); if (ad < 0) continue;
-            GENG *e = &geng[ngeng++]; lstrcpyW(e->luid, luid); lstrcpyW(e->type, type); e->v = 0; e->ad = ad;
+        const WCHAR *ls = Find(it[i].szName, L"luid_"), *te = ls ? Find(ls, L"_engtype_") : 0;
+        if (!te) continue;
+        WCHAR key[48]; int kl = (int)(te - 9 - (ls - 5)); if (kl > 47) kl = 47;
+        lstrcpynW(key, ls - 5, kl + 1);
+        int r = 0;
+        for (; r < nreng; r++) if (!lstrcmpW(reng[r].key, key)) break;
+        if (r == nreng) {                                // new engine: find its adapter and type row
+            if (nreng >= MAXE) continue;
+            WCHAR luid[24], type[24]; Luid(luid, it[i].szName);
+            lstrcpynW(type, *te ? te : L"?", 24);
+            int ad = AdFind(luid, FALSE);
+            if (ad < 0) {                                // unknown LUID: driver reset / new adapter -> reread DXGI
+                if (GetTickCount64() >= rebuildAt) { stale = TRUE; continue; }
+                ad = AdFind(luid, TRUE); if (ad < 0) continue;   // not in DXGI: keep it without a memory size
+            }
+            int g = 0;
+            for (; g < ngeng; g++) if (geng[g].ad == ad && !lstrcmpW(geng[g].type, type)) break;
+            if (g == ngeng) {
+                if (ngeng >= MAXG) continue;
+                GENG *e = &geng[ngeng++]; lstrcpyW(e->luid, luid); lstrcpyW(e->type, type); e->v = 0; e->ad = ad;
+            }
+            RENG *e = &reng[nreng++]; lstrcpyW(e->key, key); e->g = g; e->sum = 0;
         }
-        geng[g].v += it[i].FmtValue.longValue;
+        reng[r].sum += it[i].FmtValue.largeValue;
+    }
+    if (stale) { Rebuild(); return; }                    // load 0 for this tick, tables filled on the next one
+    for (int r = 0; r < nreng; r++) {                    // a type is as busy as its busiest engine
+        int v = (int)((reng[r].sum + 500) / 1000);
+        if (v > 100) v = 100;
+        if (v > geng[reng[r].g].v) geng[reng[r].g].v = v;
     }
     int busy = -1;
-    for (int g = 0; g < ngeng; g++) {
-        if (geng[g].v > 100) geng[g].v = 100;
-        if (geng[g].v > gpuLoad) { gpuLoad = geng[g].v; busy = geng[g].ad; }
-    }
+    for (int g = 0; g < ngeng; g++) if (geng[g].v > gpuLoad) { gpuLoad = geng[g].v; busy = geng[g].ad; }
     if (busy >= 0 && gad[busy].total) gpuAd = busy;      // memory follows the adapter that carries the load; idle: keep
 }
 
@@ -196,5 +235,6 @@ void SampleGpu() {
     pCollect(q);
     Engines();
     AdapterMem();
-    if (popMode == ID_GPU) ProcMem(); else ngproc = 0;   // the list is only shown in the popup
+    ProcQuery(popMode == ID_GPU);                        // the list is only shown in the popup
+    if (qp) { pCollect(qp); ProcMem(); }
 }

@@ -1,6 +1,6 @@
 #pragma once
 #include "common.h"
-#define MAXG 24                            // engine types x adapters
+#define MAXG 32                            // engine types x adapters (popup rows)
 #define MAXA 4                             // adapters
 #define GPU_ROWS ((topN + 1) / 2)          // engine rows in the popup: 5 at the default 10 (2..8)
 #define VPROC_ROWS GPU_ROWS                // process rows by video memory in the popup
