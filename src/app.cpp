@@ -24,6 +24,12 @@ void AppSample() {
     PtFinish(&ptNet); PtFinish(&ptDisk); PtFinish(&ptIo);   // after SampleProcs: names + top lists of the daily totals
 }
 
+void AppResume() {                                       // the sleep interval is folded into this throwaway sample
+    EtwResume();
+    tickPrev = tickNow; tickNow = GetTickCount64();
+    AppSample();
+}
+
 void AppTick() {
     tickPrev = tickNow; tickNow = GetTickCount64();
     AppSample();

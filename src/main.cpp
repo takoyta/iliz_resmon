@@ -105,6 +105,9 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         }
         else AppTick();
         return 0;
+    case WM_POWERBROADCAST:                              // resumed: deltas over the sleep would skew the first tick
+        if (w == PBT_APMRESUMEAUTOMATIC || w == PBT_APMRESUMESUSPEND) AppResume();
+        return TRUE;
     case WM_DISPLAYCHANGE: case WM_DPICHANGED:           // taskbar scale may have changed: icons redraw at the new size
         TrayDpiChanged(); return 0;
     case WM_SETTINGCHANGE: TrayDpiChanged(); DrawFontReset(); break;

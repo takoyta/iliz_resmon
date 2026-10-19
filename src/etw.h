@@ -6,5 +6,6 @@ extern ULONG etwErr, etwLost;              // last start error; events lost (fro
 int EtwNote();                             // !etwOn: S_NOTE_ADMIN (not elevated) or S_NOTE_BLOCKED; 0 while tracing
 void EtwInit();
 void EtwStart();                           // at startup; EtwTick retries every 15 s while down, health check every 10 s
+void EtwResume();                          // after sleep: health check / retry on the next tick
 void EtwStop();                            // on exit
 void EtwTick();                            // every timer tick: disk / net traffic into ptDisk / ptNet

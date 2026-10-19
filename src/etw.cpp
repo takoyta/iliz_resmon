@@ -150,6 +150,8 @@ static void Cleanup(int state) {                         // stop session (if ali
     etwRetryAt = GetTickCount64() + ETW_RETRY_MS;
 }
 
+void EtwResume() { etwCheckAt = etwRetryAt = 0; }
+
 void EtwStop() { if (etwOn) Cleanup(ETW_OFF); }
 
 static BOOL Alive() {                                    // trace thread running and session still exists
