@@ -4,7 +4,6 @@
 #include <evntrace.h>
 #include <evntcons.h>
 #include "etw.h"
-#include "disk.h"
 #include "procs.h"
 #include "proctot.h"
 #include "lang.h"
@@ -45,7 +44,6 @@ static ULONGLONG etwRetryAt, etwCheckAt;
 #define ETW_CHECK_MS 10000
 
 int etwOn, etwState, etwTicks; ULONG etwErr, etwLost;
-DTOP dtop[MAXD][DTOPN_MAX]; int ndtop[MAXD];
 
 static inline UINT Hash(DWORD k) { return (k * 2654435761u) >> 8; }
 
@@ -213,18 +211,10 @@ void EtwStart() {
     etwCheckAt = GetTickCount64() + ETW_CHECK_MS;
 }
 
-static void DiskTick() {                                 // daily per-process totals (all disks) + per-disk top lists
-    LONGLONG dt = TickDt();
-    for (int i = 0; i < ndisk; i++) ndtop[i] = 0;
+static void DiskTick() {                                 // fold this tick into the daily per-(process, disk) totals
     for (int a = 0; a < AGGN; a++) if (snap[a].key) {
-        const AGG *g = &snap[a];
-        PtAdd(&ptDisk, g->key - 1, g->rd, g->wr);        // several disks of one pid add up within the tick
-        int di = -1;
-        for (int i = 0; i < ndisk; i++) if (disks[i].num == g->disk) di = i;
-        if (di < 0) continue;
-        LONGLONG r = g->rd * 1000 / dt, w = g->wr * 1000 / dt, v = r + w;   // sorted by the total
-        int k = TopPush(dtop[di], &ndtop[di], DTOPN, [&](const DTOP &x) { return x.v < v; });
-        if (k >= 0) { DTOP *t = &dtop[di][k]; t->pid = g->key - 1; t->v = v; t->r = r; t->w = w; }
+        PTAB *t = PtDisk(snap[a].disk);                  // 0: a drive we don't list
+        if (t) PtAdd(t, snap[a].key - 1, snap[a].rd, snap[a].wr);
     }
 }
 
@@ -238,7 +228,7 @@ void EtwTick() {
         etwCheckAt = now + ETW_CHECK_MS;
         if (!Alive()) { etwErr = 0; Cleanup(ETW_DIED); }
     }
-    if (!etwOn) { for (int i = 0; i < ndisk; i++) ndtop[i] = 0; if (elevated && now >= etwRetryAt) EtwStart(); return; }   // not elevated: one try at startup only; daily totals kept
+    if (!etwOn) { if (elevated && now >= etwRetryAt) EtwStart(); return; }   // not elevated: one try at startup only; daily totals kept
     EnterCriticalSection(&cs);
     AGG *a = agg; agg = snap; snap = a; nAgg = 0;
     NAGG *g = nagg; nagg = nsnap; nsnap = g; nNagg = 0;

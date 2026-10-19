@@ -21,7 +21,7 @@ void AppSample() {
     SampleMem(); SampleDisks(); SampleNet(); SampleGpu();
     EtwTick();                             // per-disk / per-process net from the trace
     SampleProcs();                         // after EtwTick: NameOf() for trace pids uses this snapshot
-    PtFinish(&ptNet); PtFinish(&ptDisk); PtFinish(&ptIo);   // after SampleProcs: names + top lists of the daily totals
+    PtFinish(&ptNet, TOPN); PtFinish(&ptIo, TOPN); PtDisksFinish(PtDiskRows());   // after SampleProcs: names + top lists of the daily totals
 }
 
 void AppResume() {                                       // the sleep interval is folded into this throwaway sample

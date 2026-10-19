@@ -2,6 +2,7 @@
 #include "common.h"
 #include "proctot.h"
 #include "procs.h"
+#include "disk.h"
 
 struct PTENT_ {
     DWORD key;                             // pid + 1, 0 = empty slot
@@ -12,7 +13,7 @@ struct PTENT_ {
     WCHAR name[NAME_LEN];                  // last known name (survives process exit)
 };
 
-PTAB ptNet, ptDisk, ptIo;
+PTAB ptNet, ptIo, *ptDisk[PT_DISKS];
 
 static inline UINT Hash(DWORD k) { return (k * 2654435761u) >> 8; }
 
@@ -21,7 +22,38 @@ static void Alloc(PTAB *t, int cap, int sumSort) {
     t->cap = t->e ? cap : 0; t->sumSort = sumSort;
 }
 
-void PtInit() { Alloc(&ptNet, 1024, 0); Alloc(&ptDisk, 512, 1); Alloc(&ptIo, 512, 1); }
+void PtInit() { Alloc(&ptNet, 1024, 0); Alloc(&ptIo, 512, 1); }
+
+static DWORD ModelTag(const DISK *d) { DWORD h = 2166136261u; for (const WCHAR *p = d->model; *p; p++) h = (h ^ *p) * 16777619u; return h; }
+
+static const DISK *Listed(int num) { for (int i = 0; i < ndisk; i++) if (disks[i].num == num) return &disks[i]; return 0; }
+
+PTAB *PtDisk(int num) {                                  // 256 entries (~30 KB) per drive with traffic
+    if (num < 0 || num >= PT_DISKS) return 0;
+    if (!ptDisk[num]) {
+        const DISK *d = Listed(num); if (!d) return 0;
+        PTAB *t = (PTAB*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(PTAB)); if (!t) return 0;
+        Alloc(t, 256, 1);
+        if (!t->cap) { HeapFree(GetProcessHeap(), 0, t); return 0; }
+        t->tag = ModelTag(d); ptDisk[num] = t;
+    }
+    return ptDisk[num];
+}
+
+void PtDisksSync() {                                     // same number + same model: keep today's totals
+    for (int n = 0; n < PT_DISKS; n++) if (ptDisk[n]) {
+        const DISK *d = Listed(n);
+        if (d && ModelTag(d) == ptDisk[n]->tag) continue;
+        HeapFree(GetProcessHeap(), 0, ptDisk[n]->e); HeapFree(GetProcessHeap(), 0, ptDisk[n]); ptDisk[n] = 0;
+    }
+}
+
+int PtDiskRows() {
+    int r = ndisk > 1 ? topN / ndisk : topN, m = (topN * 2 + 2) / 5;
+    return r < m ? m : r;
+}
+
+void PtDisksFinish(int rows) { for (int n = 0; n < PT_DISKS; n++) if (ptDisk[n]) PtFinish(ptDisk[n], rows); }
 
 static LONGLONG Created(DWORD pid) {                     // snapshot first (free), else ask the process
     LONGLONG c = CreateOf(pid); if (c) return c;
@@ -94,7 +126,7 @@ static BOOL Before(const PTAB *t, const PTROW *r, const PTENT *e) {   // r sorts
     return r->ta < e->ta || (r->ta == e->ta && r->tb < e->tb);
 }
 
-void PtFinish(PTAB *t) {
+void PtFinish(PTAB *t, int rows) {
     if (!t->cap) return;
     DayCheck(t);
     LONGLONG dt = TickDt();
@@ -104,7 +136,7 @@ void PtFinish(PTAB *t) {
         BOOL now = e->last == tickNow;
         if (now) { const WCHAR *nm = NameOf(e->key - 1); if (nm[0] != '?') lstrcpynW(e->name, nm, NAME_LEN); }
         if (!e->ta && !e->tb) continue;
-        int k = TopPush(t->row, &n, TOPN, [&](const PTROW &r) { return Before(t, &r, e); });
+        int k = TopPush(t->row, &n, rows, [&](const PTROW &r) { return Before(t, &r, e); });
         if (k < 0) continue;
         PTROW *r = &t->row[k];
         r->pid = e->key - 1; r->ta = e->ta; r->tb = e->tb;
