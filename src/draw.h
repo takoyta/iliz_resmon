@@ -10,7 +10,8 @@ extern int dpi;                            // DPI of the popup's monitor
 #define ROW_TOP SC(5)                      // top margin of row 0
 #define GRAPH_ROWS 3                       // graph height = 3 rows
 
-typedef struct { HDC dc; int L, R, row; COLORREF cMain, cText, cDim; HBRUSH bar, ghost, barIn, barOut, ghost2; } PCTX;   // barIn/barOut/ghost2: two-part in|out bars
+typedef struct { COLORREF val, tot, bar; } INCOLORS;   // the view's "in" colours (read / received), see theme.h
+typedef struct { HDC dc; int L, R, row; COLORREF cMain, cText, cDim; HBRUSH bar, ghost, barIn, barOut, ghost2; const INCOLORS *in; } PCTX;   // barIn (= in->bar)/barOut/ghost2: two-part in|out bars
 
 HFONT DrawFont();                          // font for current dpi (recreated on change)
 void DrawFontReset();                      // WM_SETTINGCHANGE: the message font may have changed

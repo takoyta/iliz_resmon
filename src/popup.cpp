@@ -62,9 +62,9 @@ static void Paint(HWND h) {
     RECT r; GetClientRect(h, &r);
     HDC dc = CreateCompatibleDC(wdc);                    // draw off-screen, blit once: no flicker
     HBITMAP bmp = CreateCompatibleBitmap(wdc, r.right, r.bottom); HGDIOBJ oldBmp = SelectObject(dc, bmp);
-    COLORREF cMain, cBar; ViewColors(popMode, &cMain, &cBar);
-    PCTX c = {dc, PAD, r.right - PAD, 0, cMain, C_TEXT, C_DIM, CreateSolidBrush(cBar), CreateSolidBrush(C_GHOST_BAR), CreateSolidBrush(C_IN_BAR),
-              CreateSolidBrush(C_OUT_BAR), CreateSolidBrush(C_GHOST_BAR2)};
+    COLORREF cMain, cBar; ViewColors(popMode, &cMain, &cBar); const INCOLORS *in = ViewIn(popMode);
+    PCTX c = {dc, PAD, r.right - PAD, 0, cMain, C_TEXT, C_DIM, CreateSolidBrush(cBar), CreateSolidBrush(C_GHOST_BAR), CreateSolidBrush(in->bar),
+              CreateSolidBrush(C_OUT_BAR), CreateSolidBrush(C_GHOST_BAR2), in};
     HBRUSH bg = CreateSolidBrush(C_POP_BG), frame = CreateSolidBrush(cMain);
     FillRect(dc, &r, bg); FrameRect(dc, &r, frame);
     SelectObject(dc, DrawFont()); SetBkMode(dc, TRANSPARENT);

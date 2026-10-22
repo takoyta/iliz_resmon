@@ -31,6 +31,11 @@ int ViewRows(int mode) {
     return etwOn ? r : r + 1 + TOPN;                     // no trace: one all-I/O table
 }
 
+const INCOLORS *ViewIn(int mode) {
+    static const INCOLORS net = {C_NET_IN, C_NET_IN_TOT, C_NET_IN_BAR}, dsk = {C_DSK_IN, C_DSK_IN_TOT, C_DSK_IN_BAR};
+    return mode == ID_DISK ? &dsk : &net;
+}
+
 void ViewColors(int mode, COLORREF *cMain, COLORREF *cBar) {
     if (mode == ID_GPU) { *cMain = C_GPU; *cBar = C_GPU_DARK; return; }
     *cMain = mode == ID_CPU ? C_CPU : mode == ID_NET ? C_RX : mode == ID_MEM ? C_MEM : C_DSK;
@@ -98,7 +103,7 @@ static void PaintVolume(PCTX *c, WCHAR letter) {
 }
 
 // Two-counter process table (network rx/tx, disk read/write): name + two-part bar | rate a | rate b | today a | today b.
-// Colours are the shared in|out pair (theme.h); only the cell prefixes differ per view.
+// Colours: the view's in set (c->in) + the shared out; only the cell prefixes differ per view.
 static void Table2Cols(PCTX *c, int *x) {               // x[0..4]: left edges of rate a, rate b, Σa, Σb, right end
     int R = c->R - SC(4), w = SC(85);
     x[4] = R; x[3] = R - w; x[2] = R - 2 * w; x[1] = R - 3 * w - SC(10); x[0] = R - 4 * w - SC(10);
@@ -115,9 +120,9 @@ static void Table2(PCTX *c, const PTAB *t, const WCHAR *title, const WCHAR *empt
     for (int i = 0; i < t->nrow; i++, c->row++) {
         const PTROW *e = &t->row[i]; int lv = e->live;
         ListRow2(c, c->L, x[0] - SC(6), e->name, (LONGLONG)e->ta, (LONGLONG)e->tb, full, 3, lv);
-        FmtRate(a, e->ra);  wsprintfW(s, L"%s%s", pa, a); Text(c, x[0], x[1] - SC(6), s, lv ? C_IN : C_GHOST, DT_RIGHT);
+        FmtRate(a, e->ra);  wsprintfW(s, L"%s%s", pa, a); Text(c, x[0], x[1] - SC(6), s, lv ? c->in->val : C_GHOST, DT_RIGHT);
         FmtRate(a, e->rb);  wsprintfW(s, L"%s%s", pb, a); Text(c, x[1], x[2] - SC(10), s, lv ? C_OUT : C_GHOST, DT_RIGHT);
-        FmtBytes(a, e->ta); wsprintfW(s, L"%s%s", pa, a); Text(c, x[2], x[3] - SC(6), s, lv ? C_IN_TOT : C_GHOST, DT_RIGHT);
+        FmtBytes(a, e->ta); wsprintfW(s, L"%s%s", pa, a); Text(c, x[2], x[3] - SC(6), s, lv ? c->in->tot : C_GHOST, DT_RIGHT);
         FmtBytes(a, e->tb); wsprintfW(s, L"%s%s", pb, a); Text(c, x[3], x[4], s, lv ? C_OUT_TOT : C_GHOST, DT_RIGHT);
     }
 }
@@ -160,7 +165,7 @@ static void PaintNetGraph(PCTX *c) {                    // rx area + tx line, au
     for (int i = 0; i < n; i++) { ULONG x = HistNet(H_RX, i), y = HistNet(H_TX, i); if (x > mx) mx = x; if (y > mx) mx = y; }
     for (int i = 0; i < n; i++) { g1[i] = (int)((ULONGLONG)HistNet(H_RX, i) * 1000 / mx); g2[i] = (int)((ULONGLONG)HistNet(H_TX, i) * 1000 / mx); }
     WCHAR s[24]; FmtRate(s, mx);
-    PCTX g = *c; g.cMain = C_IN; g.bar = c->barIn;       // rx area + tx line in the shared in|out colours
+    PCTX g = *c; g.cMain = c->in->val; g.bar = c->barIn; // rx area + tx line in the in|out colours
     PaintGraph(&g, g1, g2, n, C_OUT, 1, s); c->row = g.row;
 }
 

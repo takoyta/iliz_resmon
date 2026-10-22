@@ -42,7 +42,7 @@ void RxTx(PCTX *c, LONGLONG rx, LONGLONG tx) {
     int tw = sz.cx > SC(85) ? sz.cx : SC(85);
     Text(c, R - tw, R, s, C_OUT, DT_LEFT);
     FmtRate(a, rx); wsprintfW(s, L"↓ %s", a);
-    Text(c, R - tw - SC(95), R - tw - SC(8), s, C_IN, DT_LEFT);
+    Text(c, R - tw - SC(95), R - tw - SC(8), s, c->in->val, DT_LEFT);
 }
 
 static void Curve(const int *v, int n, POINT *pt, int x0, int W, int y1, int H) {
