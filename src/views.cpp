@@ -32,7 +32,7 @@ int ViewRows(int mode) {
 }
 
 const INCOLORS *ViewIn(int mode) {
-    static const INCOLORS net = {C_NET_IN, C_NET_IN_TOT, C_NET_IN_BAR}, dsk = {C_DSK_IN, C_DSK_IN_TOT, C_DSK_IN_BAR};
+    static const INCOLORS net = {C_NET_IN, C_NET_IN_BAR}, dsk = {C_DSK_IN, C_DSK_IN_BAR};
     return mode == ID_DISK ? &dsk : &net;
 }
 
@@ -122,8 +122,8 @@ static void Table2(PCTX *c, const PTAB *t, const WCHAR *title, const WCHAR *empt
         ListRow2(c, c->L, x[0] - SC(6), e->name, (LONGLONG)e->ta, (LONGLONG)e->tb, full, 3, lv);
         FmtRate(a, e->ra);  wsprintfW(s, L"%s%s", pa, a); Text(c, x[0], x[1] - SC(6), s, lv ? c->in->val : C_GHOST, DT_RIGHT);
         FmtRate(a, e->rb);  wsprintfW(s, L"%s%s", pb, a); Text(c, x[1], x[2] - SC(10), s, lv ? C_OUT : C_GHOST, DT_RIGHT);
-        FmtBytes(a, e->ta); wsprintfW(s, L"%s%s", pa, a); Text(c, x[2], x[3] - SC(6), s, lv ? c->in->tot : C_GHOST, DT_RIGHT);
-        FmtBytes(a, e->tb); wsprintfW(s, L"%s%s", pb, a); Text(c, x[3], x[4], s, lv ? C_OUT_TOT : C_GHOST, DT_RIGHT);
+        FmtBytes(a, e->ta); wsprintfW(s, L"%s%s", pa, a); Text(c, x[2], x[3] - SC(6), s, lv ? c->in->val : C_GHOST, DT_RIGHT);
+        FmtBytes(a, e->tb); wsprintfW(s, L"%s%s", pb, a); Text(c, x[3], x[4], s, lv ? C_OUT : C_GHOST, DT_RIGHT);
     }
 }
 

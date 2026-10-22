@@ -14,16 +14,13 @@
 #define C_VRAM      RGB(80, 235, 255)      // video memory line over the GPU load (contrasts with the pink columns)
 
 // Two-way traffic: in = disk read / network received (own colour per section), out = disk write / network sent
-// (orange everywhere). Value: "speed" column, graph line, icon; _TOT: "today" column; _BAR: process bars, graph area
+// (orange everywhere). Value: table values (speed and today), graph line, icon; _BAR: process bars, graph area
 // (dark: text on them stays readable).
 #define C_NET_IN      RGB(110, 225, 110)
-#define C_NET_IN_TOT  RGB(80, 170, 80)
 #define C_NET_IN_BAR  RGB(40, 105, 40)
 #define C_DSK_IN      C_RX                 // the network accent blue
-#define C_DSK_IN_TOT  RGB(70, 130, 180)
 #define C_DSK_IN_BAR  C_RX_DARK
 #define C_OUT       RGB(255, 150, 40)
-#define C_OUT_TOT   RGB(180, 110, 40)
 #define C_OUT_BAR   RGB(135, 75, 20)
 
 #define C_ICON_BG     RGB(20, 30, 28)
