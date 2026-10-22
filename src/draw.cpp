@@ -29,7 +29,7 @@ void Text(PCTX *c, int l, int r, const WCHAR *s, COLORREF col, UINT al) {
     DrawTextW(c->dc, s, -1, &t, DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS | al);
 }
 
-void Bar(PCTX *c, int x0, int w, int inset, HBRUSH br) {
+static void Bar(PCTX *c, int x0, int w, int inset, HBRUSH br) {
     int y = RowY(c);
     RECT b = {x0, y + SC(inset), x0 + w, y + ROWH - SC(inset) + SC(2)};
     FillRect(c->dc, &b, br);

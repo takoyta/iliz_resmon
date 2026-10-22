@@ -24,7 +24,7 @@ int ViewWidth(int mode) { return mode == ID_GPU ? SC(320) : mode == ID_NET ? SC(
 int ViewRows(int mode) {
     if (mode == ID_CPU) return 1 + GRAPH_ROWS + TOPN;
     if (mode == ID_GPU) return 2 + GRAPH_ROWS + GPU_ROWS + 1 + VPROC_ROWS;
-    if (mode == ID_MEM) return 5 + GRAPH_ROWS + (mem.cache ? 1 : 0) + TOPN;
+    if (mode == ID_MEM) return 4 + GRAPH_ROWS + (mem.cache ? 1 : 0) + TOPN;
     if (mode == ID_NET) return 2 * (nnic ? nnic : 1) + GRAPH_ROWS + (etwOn ? 2 + TOPN : 1);
     int r = 0;
     for (int i = 0; i < ndisk; i++) r += 2 + lstrlenW(disks[i].letters) + (etwOn ? 1 + PtDiskRows() : 0);   // + per-disk table
@@ -76,10 +76,6 @@ static void PaintMem(PCTX *c) {
     wsprintfW(s, T(S_MEM_HDR), mem.load, a, b);
     Text(c, c->L, c->R, s, c->cMain, DT_LEFT); c->row++;
     PaintGraph(c, g1, 0, Pct(H_MEM, g1), 0, 0, L"100%");
-    int y = RowY(c);                                     // usage bar
-    RECT o = {c->L, y + SC(5), c->R, y + ROWH - SC(5)};
-    FrameRect(c->dc, &o, c->bar);
-    Bar(c, c->L, (c->R - c->L) * mem.load / 100, 5, c->bar); c->row++;
     FmtBytes(a, mem.avail); Line(c, T(S_AVAIL), a);
     if (mem.cache) { FmtBytes(a, mem.cache); Line(c, T(S_CACHE), a); }
     FmtBytes(a, mem.commit); FmtBytes(b, mem.commitLimit);

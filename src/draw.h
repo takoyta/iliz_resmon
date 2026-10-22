@@ -17,7 +17,6 @@ HFONT DrawFont();                          // font for current dpi (recreated on
 void DrawFontReset();                      // WM_SETTINGCHANGE: the message font may have changed
 int RowY(const PCTX *c);                   // top y of the current row
 void Text(PCTX *c, int l, int r, const WCHAR *s, COLORREF col, UINT al);
-void Bar(PCTX *c, int x0, int w, int inset, HBRUSH br);
 void RxTx(PCTX *c, LONGLONG rx, LONGLONG tx);   // "↓ rx  ↑ tx" right-aligned
 // Graph over GRAPH_ROWS rows. Series 0..1000, n samples, newest right; l2 drawn on top if l2Top.
 void PaintGraph(PCTX *c, const int *fill, const int *l2, int n, COLORREF c2, int l2Top, const WCHAR *topLabel);
