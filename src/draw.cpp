@@ -35,14 +35,14 @@ void Bar(PCTX *c, int x0, int w, int inset, HBRUSH br) {
     FillRect(c->dc, &b, br);
 }
 
-void RxTx(PCTX *c, LONGLONG rx, LONGLONG tx, COLORREF cRx, COLORREF cTx) {
+void RxTx(PCTX *c, LONGLONG rx, LONGLONG tx) {
     WCHAR a[24], s[32]; SIZE sz; int R = c->R;
     FmtRate(a, tx); wsprintfW(s, L"↑ %s", a);
     GetTextExtentPoint32W(c->dc, s, lstrlenW(s), &sz);
     int tw = sz.cx > SC(85) ? sz.cx : SC(85);
-    Text(c, R - tw, R, s, cTx, DT_LEFT);
+    Text(c, R - tw, R, s, C_OUT, DT_LEFT);
     FmtRate(a, rx); wsprintfW(s, L"↓ %s", a);
-    Text(c, R - tw - SC(95), R - tw - SC(8), s, cRx, DT_LEFT);
+    Text(c, R - tw - SC(95), R - tw - SC(8), s, C_IN, DT_LEFT);
 }
 
 static void Curve(const int *v, int n, POINT *pt, int x0, int W, int y1, int H) {
@@ -83,16 +83,24 @@ void PaintGraph(PCTX *c, const int *fill, const int *l2, int n, COLORREF c2, int
     c->row += GRAPH_ROWS;
 }
 
-COLORREF ListRow2(PCTX *c, int x0, int nameR, const WCHAR *name, LONGLONG v1, LONGLONG v2, LONGLONG full, int inset, int live) {
+static COLORREF Row(PCTX *c, int x0, int nameR, const WCHAR *name, LONGLONG v1, LONGLONG v2, LONGLONG full, int inset, int live, HBRUSH b1br) {
     int W = c->R - x0;
     if (v1 < 0) v1 = 0;
     if (v2 < 0) v2 = 0;
     LONGLONG v = v1 + v2;
     int bw = (int)(v * W / (full ? full : 1)); if (bw < 1) bw = 1; if (bw > W) bw = W;
     int b1 = v ? (int)(v1 * bw / v) : bw;                // split proportionally inside the bar
-    if (b1) Bar(c, x0, b1, inset, live ? c->bar : c->ghost);
-    if (bw - b1) Bar(c, x0 + b1, bw - b1, inset, live ? c->bar2 : c->ghost2);
+    if (b1) Bar(c, x0, b1, inset, live ? b1br : c->ghost);
+    if (bw - b1) Bar(c, x0 + b1, bw - b1, inset, live ? c->barOut : c->ghost2);
     COLORREF ct = live ? c->cText : C_GHOST;
     Text(c, x0 + SC(4), nameR, name, ct, DT_LEFT);
     return ct;
+}
+
+COLORREF ListRow(PCTX *c, int x0, int nameR, const WCHAR *name, LONGLONG v, LONGLONG full, int inset, int live) {
+    return Row(c, x0, nameR, name, v, 0, full, inset, live, c->bar);
+}
+
+void ListRow2(PCTX *c, int x0, int nameR, const WCHAR *name, LONGLONG vin, LONGLONG vout, LONGLONG full, int inset, int live) {
+    Row(c, x0, nameR, name, vin, vout, full, inset, live, c->barIn);
 }

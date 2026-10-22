@@ -98,13 +98,13 @@ static void PaintVolume(PCTX *c, WCHAR letter) {
 }
 
 // Two-counter process table (network rx/tx, disk read/write): name + two-part bar | rate a | rate b | today a | today b.
-typedef struct { const WCHAR *pa, *pb; COLORREF cB, cTa, cTb; } TSTYLE;   // cell prefixes, colours of b / totals
+// Colours are the shared in|out pair (theme.h); only the cell prefixes differ per view.
 static void Table2Cols(PCTX *c, int *x) {               // x[0..4]: left edges of rate a, rate b, Σa, Σb, right end
     int R = c->R - SC(4), w = SC(85);
     x[4] = R; x[3] = R - w; x[2] = R - 2 * w; x[1] = R - 3 * w - SC(10); x[0] = R - 4 * w - SC(10);
 }
 
-static void Table2(PCTX *c, const PTAB *t, const WCHAR *title, const WCHAR *empty, const TSTYLE *st) {
+static void Table2(PCTX *c, const PTAB *t, const WCHAR *title, const WCHAR *empty, const WCHAR *pa, const WCHAR *pb) {
     int x[5]; Table2Cols(c, x); WCHAR a[24], s[32];
     Text(c, c->L, x[0], title, c->cMain, DT_LEFT);
     Text(c, x[0], x[2] - SC(10), T(S_SPEED), c->cDim, DT_CENTER);
@@ -114,16 +114,15 @@ static void Table2(PCTX *c, const PTAB *t, const WCHAR *title, const WCHAR *empt
     for (int i = 0; i < t->nrow; i++) if ((LONGLONG)(t->row[i].ta + t->row[i].tb) > full) full = (LONGLONG)(t->row[i].ta + t->row[i].tb);
     for (int i = 0; i < t->nrow; i++, c->row++) {
         const PTROW *e = &t->row[i]; int lv = e->live;
-        COLORREF ct = ListRow2(c, c->L, x[0] - SC(6), e->name, (LONGLONG)e->ta, (LONGLONG)e->tb, full, 3, lv);
-        FmtRate(a, e->ra);  wsprintfW(s, L"%s%s", st->pa, a); Text(c, x[0], x[1] - SC(6), s, ct, DT_RIGHT);
-        FmtRate(a, e->rb);  wsprintfW(s, L"%s%s", st->pb, a); Text(c, x[1], x[2] - SC(10), s, lv ? st->cB : C_GHOST, DT_RIGHT);
-        FmtBytes(a, e->ta); wsprintfW(s, L"%s%s", st->pa, a); Text(c, x[2], x[3] - SC(6), s, lv ? st->cTa : C_GHOST, DT_RIGHT);
-        FmtBytes(a, e->tb); wsprintfW(s, L"%s%s", st->pb, a); Text(c, x[3], x[4], s, lv ? st->cTb : C_GHOST, DT_RIGHT);
+        ListRow2(c, c->L, x[0] - SC(6), e->name, (LONGLONG)e->ta, (LONGLONG)e->tb, full, 3, lv);
+        FmtRate(a, e->ra);  wsprintfW(s, L"%s%s", pa, a); Text(c, x[0], x[1] - SC(6), s, lv ? C_IN : C_GHOST, DT_RIGHT);
+        FmtRate(a, e->rb);  wsprintfW(s, L"%s%s", pb, a); Text(c, x[1], x[2] - SC(10), s, lv ? C_OUT : C_GHOST, DT_RIGHT);
+        FmtBytes(a, e->ta); wsprintfW(s, L"%s%s", pa, a); Text(c, x[2], x[3] - SC(6), s, lv ? C_IN_TOT : C_GHOST, DT_RIGHT);
+        FmtBytes(a, e->tb); wsprintfW(s, L"%s%s", pb, a); Text(c, x[3], x[4], s, lv ? C_OUT_TOT : C_GHOST, DT_RIGHT);
     }
 }
 
 static void PaintDisk(PCTX *c) {
-    static const TSTYLE st = {L"", L"", C_TX, C_DSK_TOT, C_TX_TOT};   // read | write: colours only
     WCHAR s[160], a[32], b[32];
     for (int i = 0; i < ndisk; i++) {
         DISK *d = &disks[i];
@@ -147,13 +146,13 @@ static void PaintDisk(PCTX *c) {
         if (etwOn) {                                     // today's processes on this drive; fixed slot height
             static const PTAB none = {0};
             const PTAB *t = d->num < PT_DISKS ? ptDisk[d->num] : 0; int r0 = c->row;   // 0 until the first traffic
-            Table2(c, t ? t : &none, T(S_PROCS), etwTicks ? T(S_SILENCE) : T(S_MEASURING), &st);
+            Table2(c, t ? t : &none, T(S_PROCS), etwTicks ? T(S_SILENCE) : T(S_MEASURING), L"", L"");   // read | write: colours only
             c->row = r0 + 1 + PtDiskRows();
         }
     }
     // Without the trace there is no per-drive attribution: one table from the process I/O counters,
     // which also count files in cache, devices and network.
-    if (!etwOn) Table2(c, &ptIo, T(S_PROCS_ALLIO), haveBase ? T(S_QUIET) : T(S_MEASURING), &st);
+    if (!etwOn) Table2(c, &ptIo, T(S_PROCS_ALLIO), haveBase ? T(S_QUIET) : T(S_MEASURING), L"", L"");
 }
 
 static void PaintNetGraph(PCTX *c) {                    // rx area + tx line, auto-scaled to window max
@@ -161,7 +160,8 @@ static void PaintNetGraph(PCTX *c) {                    // rx area + tx line, au
     for (int i = 0; i < n; i++) { ULONG x = HistNet(H_RX, i), y = HistNet(H_TX, i); if (x > mx) mx = x; if (y > mx) mx = y; }
     for (int i = 0; i < n; i++) { g1[i] = (int)((ULONGLONG)HistNet(H_RX, i) * 1000 / mx); g2[i] = (int)((ULONGLONG)HistNet(H_TX, i) * 1000 / mx); }
     WCHAR s[24]; FmtRate(s, mx);
-    PaintGraph(c, g1, g2, n, C_TX, 1, s);
+    PCTX g = *c; g.cMain = C_IN; g.bar = c->barIn;       // rx area + tx line in the shared in|out colours
+    PaintGraph(&g, g1, g2, n, C_OUT, 1, s); c->row = g.row;
 }
 
 static void PaintNet(PCTX *c) {
@@ -170,7 +170,7 @@ static void PaintNet(PCTX *c) {
     for (int i = 0; i < nnic; i++) {
         NIC *n = &nics[i];
         Text(c, c->L, c->R - SC(170), n->name, c->cMain, DT_LEFT);
-        RxTx(c, n->rps, n->tps, c->cMain, C_TX); c->row++;
+        RxTx(c, n->rps, n->tps); c->row++;
         FmtBytes(a, n->in0 - n->inStart); FmtBytes(b, n->out0 - n->outStart);
         wsprintfW(s, T(S_NIC_TOT), a, b);
         Text(c, c->L + SC(8), c->R, s, c->cDim, DT_LEFT); c->row++;
@@ -180,8 +180,7 @@ static void PaintNet(PCTX *c) {
         Text(c, c->L, c->R, T(EtwNote()), c->cDim, DT_LEFT); c->row++;
         return;
     }
-    static const TSTYLE st = {L"↓ ", L"↑ ", C_TX, C_RX_TOT, C_TX_TOT};
-    Table2(c, &ptNet, T(S_PROCS), etwTicks ? T(S_SILENCE) : T(S_MEASURING), &st);
+    Table2(c, &ptNet, T(S_PROCS), etwTicks ? T(S_SILENCE) : T(S_MEASURING), L"↓ ", L"↑ ");
 }
 
 static void PaintGpu(PCTX *c) {                         // load, VRAM, graph (load + VRAM line), engine types, VRAM processes

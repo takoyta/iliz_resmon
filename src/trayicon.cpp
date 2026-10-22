@@ -72,10 +72,10 @@ static HICON DrawBars(const int *vals, int n, COLORREF cAvg, COLORREF cMax) {
     return End(&c);
 }
 
-static HICON DrawNet() {                                 // two bars: rx blue, tx orange
+static HICON DrawNet() {                                 // two bars: rx (in), tx (out)
     CANVAS c; Begin(&c, C_ICON_BG_NET); int S = c.S;
     int v[2] = {netRx > 100 ? 100 : netRx, netTx > 100 ? 100 : netTx};
-    HBRUSH br[2] = {CreateSolidBrush(C_RX), CreateSolidBrush(C_TX)};
+    HBRUSH br[2] = {CreateSolidBrush(C_IN), CreateSolidBrush(C_OUT)};
     for (int b = 0; b < 2; b++) {
         int hh = (v[b] * S + 50) / 100; if (v[b] > 0 && hh < 1) hh = 1;
         RECT r = {b * S / 2, S - hh, (b + 1) * S / 2 - 1, S};

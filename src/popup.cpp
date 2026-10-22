@@ -63,13 +63,13 @@ static void Paint(HWND h) {
     HDC dc = CreateCompatibleDC(wdc);                    // draw off-screen, blit once: no flicker
     HBITMAP bmp = CreateCompatibleBitmap(wdc, r.right, r.bottom); HGDIOBJ oldBmp = SelectObject(dc, bmp);
     COLORREF cMain, cBar; ViewColors(popMode, &cMain, &cBar);
-    PCTX c = {dc, PAD, r.right - PAD, 0, cMain, C_TEXT, C_DIM, CreateSolidBrush(cBar), CreateSolidBrush(C_GHOST_BAR),
-              CreateSolidBrush(C_TX_BAR), CreateSolidBrush(C_GHOST_BAR2)};
+    PCTX c = {dc, PAD, r.right - PAD, 0, cMain, C_TEXT, C_DIM, CreateSolidBrush(cBar), CreateSolidBrush(C_GHOST_BAR), CreateSolidBrush(C_IN_BAR),
+              CreateSolidBrush(C_OUT_BAR), CreateSolidBrush(C_GHOST_BAR2)};
     HBRUSH bg = CreateSolidBrush(C_POP_BG), frame = CreateSolidBrush(cMain);
     FillRect(dc, &r, bg); FrameRect(dc, &r, frame);
     SelectObject(dc, DrawFont()); SetBkMode(dc, TRANSPARENT);
     ViewPaint(&c, popMode);
-    DeleteObject(bg); DeleteObject(c.bar); DeleteObject(c.ghost); DeleteObject(c.bar2); DeleteObject(c.ghost2); DeleteObject(frame);
+    DeleteObject(bg); DeleteObject(c.bar); DeleteObject(c.ghost); DeleteObject(c.barIn); DeleteObject(c.barOut); DeleteObject(c.ghost2); DeleteObject(frame);
     BitBlt(wdc, 0, 0, r.right, r.bottom, dc, 0, 0, SRCCOPY);
     SelectObject(dc, oldBmp); DeleteObject(bmp); DeleteDC(dc);
     EndPaint(h, &ps);
